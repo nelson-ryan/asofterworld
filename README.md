@@ -1,7 +1,6 @@
 # A Softer World Text Analysis
 
-This is the start of a project that I first thought of just under 5 and a half years ago,
-on May 27, 2005, just a few days before the final A Softer World comic.
+This is the start of a project that I first thought of on May 27, 2015, just a few days before the final A Softer World comic.
 
 The spirit of the idea is to look for any sort of pattern in how sentences are
 broken up between panels in A Softer World comics, relative to the structure
