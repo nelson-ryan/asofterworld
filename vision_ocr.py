@@ -13,7 +13,7 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "C:/Users/xople/Documents/asofter
 path = "comics/0001_myparents.jpg"
 
 
-#def detect_text(path):
+def detect_text(path):
 """Detects text in the file."""
 from google.cloud import vision
 from google.cloud.vision import types

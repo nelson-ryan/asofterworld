@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Oct 20 11:21:20 2020
-@author: xople
+@author: nelsonr
 
 This section of code defines a function to download and save
 all A Softer World comics from the website, utilizing the
