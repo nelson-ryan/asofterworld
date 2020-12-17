@@ -9,8 +9,9 @@ Beautiful Soup package.
 
 """
 
-import bs4 #beautifulsoup4
+import bs4  # beautifulsoup4
 import requests
+
 
 # UPDATE COMIC RANGE IN FUNCTION CALL
 def main():
