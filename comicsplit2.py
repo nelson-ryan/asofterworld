@@ -11,20 +11,24 @@ Created on Wed Oct 28 09:53:37 2020
 
 
 import cv2 # OpenCV (opencv-python)
+import os
+
+if not os.path.exists("split-test/"):
+    os.mkdir("split-test/")
 
 # Load image
-im = cv2.imread('comics/0392_sit.jpg',cv2.IMREAD_UNCHANGED)
+im = cv2.imread('comics/0392_sit.jpg', cv2.IMREAD_UNCHANGED)
 
 # Create greyscale version
 gr = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
 
 # Threshold to get black and white
-_,grthresh = cv2.threshold(gr,230,255,cv2.THRESH_BINARY)
-cv2.imwrite('result-1.png',grthresh)
+_,grthresh = cv2.threshold(gr, 230, 255, cv2.THRESH_BINARY)
+cv2.imwrite('split-test/result-1.png', grthresh)
 
 # Median filter to remove JPEG noise
-grthresh = cv2.medianBlur(grthresh,11)
-cv2.imwrite('result-2.png', grthresh)
+grthresh = cv2.medianBlur(grthresh, 11)
+cv2.imwrite('split-test/result-2.png', grthresh)
 
 # Find contours
 contours, hierarchy = cv2.findContours(grthresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
@@ -53,5 +57,5 @@ for i in range(len(contours)):
         x1 = int(round(max(Xs)))
         y0 = int(round(min(Ys)))
         y1 = int(round(max(Ys)))
-        cv2.imwrite(f'frame-{frame}.png', im[y0:y1, x0:x1])
+        cv2.imwrite(f'split-test/frame-{frame}.png', im[y0:y1, x0:x1])
         frame += 1
