@@ -10,7 +10,7 @@ Created on Wed Oct 28 09:53:37 2020
 # solution to ordering modified from https://stackoverflow.com/a/39445901
 
 
-import cv2
+import cv2 # OpenCV (opencv-python)
 
 # Load image
 im = cv2.imread('comics/0392_sit.jpg',cv2.IMREAD_UNCHANGED)
