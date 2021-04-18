@@ -13,9 +13,10 @@ import bs4  # beautifulsoup4
 import requests
 import os  # for directory checking and creation
 
+
 # UPDATE COMIC RANGE IN FUNCTION CALL
 def main():
-    for i in range(700,705):
+    for i in range(700, 705):
         save_comic(i)
 
 
@@ -26,7 +27,6 @@ def save_comic(n):
     res.raise_for_status()
     
     soup = bs4.BeautifulSoup(res.text, "html.parser")
-    
     comic = soup.select("#comicimg > img")
     
     url = comic[0].get('src')
@@ -37,7 +37,6 @@ def save_comic(n):
     # print(filename)
     
     imgurl = requests.get(url)
-    res.raise_for_status()
 
     if not os.path.exists('comics/'):
         os.mkdir('comics/')
