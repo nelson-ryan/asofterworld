@@ -8,22 +8,22 @@ Testing the Google Cloud Vision API for OCR
 """
 
 import os
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "C:/Users/xople/Documents/asofterworld/nomadic-zoo-293819-8ccfdaa58681.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "nomadic-zoo-293819-8ccfdaa58681.json"
 
-path = "comics/0001_myparents.jpg"
+path = "comics/0702_graverobber.jpg"
 
 
-def detect_text(path):
+#def detect_text(path):
 """Detects text in the file."""
 from google.cloud import vision
-from google.cloud.vision import types
+# from google.cloud.vision import types # No longer necessary from version 2.0.0????
 import io
 client = vision.ImageAnnotatorClient()
 
 with io.open(path, 'rb') as image_file:
     content = image_file.read()
 
-image = types.Image(content=content)
+image = vision.Image(content=content)
 
 response = client.text_detection(image=image)
 texts = response.text_annotations
