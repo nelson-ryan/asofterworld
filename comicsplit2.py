@@ -17,7 +17,7 @@ def split_frames(filename, dest_folder="split-frames/"):
         os.mkdir(dest_folder)
 
     title = filename.split(sep="/")[-1].split(sep=".")[-2]
-    print(title)
+
     # Load image
     im = cv2.imread(filename, cv2.IMREAD_UNCHANGED)
 
