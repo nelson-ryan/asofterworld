@@ -35,11 +35,11 @@ def save_comic(n):
     # print(comicnumber)
     # print(alttext)
     # print(filename)
-    
-    imgurl = requests.get(url)
 
     if not os.path.exists('comics/'):
         os.mkdir('comics/')
+
+    imgurl = requests.get(url)
     with open(f'comics/{comicnumber:04d}_{filename}', 'wb') as img:
         img.write(imgurl.content)
 
