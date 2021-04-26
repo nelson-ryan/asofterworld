@@ -40,7 +40,7 @@ def split_frames(filename, dest_folder="split-frames/"):
     # From https://stackoverflow.com/a/56473372 again
     # Look through contours, checking what we found
     frame = 0
-    for i in range(len(contours)):
+    for i in range(1, len(contours)):
         area = cv2.contourArea(contours[i])
         # Only consider ones taller than around 100 pixels and wider than about 300 pixels
         if area > 30000:
