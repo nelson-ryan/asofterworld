@@ -14,11 +14,17 @@ import requests
 import os  # for directory checking and creation
 
 
-# UPDATE COMIC RANGE IN FUNCTION CALL
+# UPDATE FIRST COMIC NUMBER IN FUNCTION CALL
 def main():
     comics = []
-    for i in range(700, 705):
-        comics.append(save_comic(i))
+    currentcomic = 1245
+    while True:
+        gotcomic = save_comic(currentcomic)
+        if gotcomic:
+            comics.append(gotcomic)
+            currentcomic += 1
+        else:
+            break
     for i in range(len(comics)):
         print(comics[i])
 
@@ -33,8 +39,13 @@ def save_comic(n):
     comic = soup.select("#comicimg > img")
     
     url = comic[0].get('src')
-    alttext = comic[0].get('title')
+
     filename = url.split('/')[-1] # filename is last part of URL, following the last slash
+    # If there's no filename, there's no comic, so stop
+    if not filename:
+        return
+
+    alttext = comic[0].get('title')
 
     comicdict["comicnumber"] = comicnumber
     comicdict["filename"] = filename
