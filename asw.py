@@ -16,12 +16,15 @@ import os  # for directory checking and creation
 
 # UPDATE COMIC RANGE IN FUNCTION CALL
 def main():
+    comics = []
     for i in range(700, 705):
-        save_comic(i)
+        comics.append(save_comic(i))
+    for i in range(len(comics)):
+        print(comics[i])
 
 
 def save_comic(n):
-    
+    comicdict = {}
     comicnumber = n
     res = requests.get(f'https://www.asofterworld.com/index.php?id={comicnumber}')
     res.raise_for_status()
@@ -32,9 +35,10 @@ def save_comic(n):
     url = comic[0].get('src')
     alttext = comic[0].get('title')
     filename = url.split('/')[-1] # filename is last part of URL, following the last slash
-    # print(comicnumber)
-    # print(alttext)
-    # print(filename)
+
+    comicdict["comicnumber"] = comicnumber
+    comicdict["filename"] = filename
+    comicdict["alttext"] = alttext
 
     if not os.path.exists('comics/'):
         os.mkdir('comics/')
@@ -42,6 +46,8 @@ def save_comic(n):
     imgurl = requests.get(url)
     with open(f'comics/{comicnumber:04d}_{filename}', 'wb') as img:
         img.write(imgurl.content)
+
+    return comicdict
 
 main()
 
