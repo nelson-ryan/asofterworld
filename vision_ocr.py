@@ -28,19 +28,15 @@ def detect_text(path):
     response = client.text_detection(image=image)
     texts = response.text_annotations
 
-    #print(type(texts))
+    # Checking annotation output. This doesn't seem to include whitespace characters, but that shouldn't be an issue
+    print(type(texts))
+    print(texts)
 
     print('Texts:')
-
     print('\n"{}"'.format(texts[0].description))
 
-    #     vertices = (['({},{})'.format(vertex.x, vertex.y)
-    #                 for vertex in text.bounding_poly.vertices])
-
-    #     print('bounds: {}'.format(','.join(vertices)))
-
     '''
-    Within 'texts' are objects for 'description', which is the read text,
+    Within 'texts' are objects for 'description', which is the text that is read,
     and appears to be separated by word, and also includes new lines.
     These are an EntityAnnotation type, but can be converted to str()
     
@@ -52,5 +48,9 @@ def detect_text(path):
             '{}\nFor more info on error messages, check: '
             'https://cloud.google.com/apis/design/errors'.format(
                 response.error.message))
-        
+
+    # or just return the annotation data like so, to compare bounding vertices outside the function:
+    # return texts
+
+
 detect_text(path)
