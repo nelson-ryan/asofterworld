@@ -55,6 +55,8 @@ def split_frames(filename, dest_folder="split-frames/"):
             y1 = int(round(max(Ys)))
             cv2.imwrite(f'split-test/{title}-{frame:02d}.png', im[y0:y1, x0:x1])
             frame += 1
-
+    # Rather than save each individual frame and running those each through the Cloud Vision OCR,
+    # I may be able to just compare these bounding boxes to the bounding polys from the OCR to determine
+    # which frame they're in (cutting the number of API requests down by more than a factor of 3).
 
 split_frames('comics/0753_purina.jpg')
