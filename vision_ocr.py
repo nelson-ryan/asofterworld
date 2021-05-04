@@ -13,7 +13,7 @@ import io
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "nomadic-zoo-293819-8ccfdaa58681.json"
 
-testpath = "comics/0753_purina.jpg"
+#testpath = "comics/0753_purina.jpg"
 
 
 def detect_text(path):
@@ -53,4 +53,4 @@ def detect_text(path):
     # or just return the annotation data like so, to compare bounding vertices outside the function:
     return texts
 
-print(detect_text(testpath))
+#print(detect_text(testpath))
