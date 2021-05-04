@@ -16,8 +16,7 @@ import os
 def split_frames(filename):
     # if not os.path.exists(dest_folder):
     #     os.mkdir(dest_folder)
-
-    title = filename.split(sep="/")[-1].split(sep=".")[-2]
+    # title = filename.split(sep="/")[-1].split(sep=".")[-2]
 
     # Load image
     im = cv2.imread(filename, cv2.IMREAD_UNCHANGED)
@@ -58,9 +57,10 @@ def split_frames(filename):
             # No longer save the files
             # cv2.imwrite(f'split-test/{title}-{frame:02d}.png', im[y0:y1, x0:x1])
             frame_id = 'frame_' + str(frame)
-            print(frame_id)
-            print(box)
-            frame_bounds[frame_id] = [x0, x1, y0, y1]
+            #print(frame_id)
+            #print(type(box))
+            #frame_bounds[frame_id] = [x0, x1, y0, y1]
+            frame_bounds[frame_id] = box
             frame += 1
     # Rather than save each individual frame and running those each through the Cloud Vision OCR,
     # I may be able to just compare these bounding boxes to the bounding polys from the OCR to determine
@@ -69,4 +69,4 @@ def split_frames(filename):
     return frame_bounds
 
 
-print(split_frames('comics/0753_purina.jpg'))
+#print(split_frames('comics/0753_purina.jpg'))
