@@ -12,11 +12,11 @@ import cv2  # OpenCV (opencv-python)
 import os
 
 
-def split_frames(filename, dest_folder="split-frames/"):
-    if not os.path.exists(dest_folder):
-        os.mkdir(dest_folder)
-
-    title = filename.split(sep="/")[-1].split(sep=".")[-2]
+# def split_frames(filename, dest_folder="split-frames/"):
+def split_frames(filename):
+    # if not os.path.exists(dest_folder):
+    #     os.mkdir(dest_folder)
+    # title = filename.split(sep="/")[-1].split(sep=".")[-2]
 
     # Load image
     im = cv2.imread(filename, cv2.IMREAD_UNCHANGED)
@@ -40,6 +40,7 @@ def split_frames(filename, dest_folder="split-frames/"):
     # From https://stackoverflow.com/a/56473372 again
     # Look through contours, checking what we found
     frame = 0
+    frame_bounds = {}
     for i in range(1, len(contours)):
         area = cv2.contourArea(contours[i])
         # Only consider ones taller than around 100 pixels and wider than about 300 pixels
@@ -53,10 +54,19 @@ def split_frames(filename, dest_folder="split-frames/"):
             x1 = int(round(max(Xs)))
             y0 = int(round(min(Ys)))
             y1 = int(round(max(Ys)))
-            cv2.imwrite(f'split-test/{title}-{frame:02d}.png', im[y0:y1, x0:x1])
+            # No longer save the files
+            # cv2.imwrite(f'split-test/{title}-{frame:02d}.png', im[y0:y1, x0:x1])
+            frame_id = 'frame_' + str(frame)
+            #print(frame_id)
+            #print(type(box))
+            #frame_bounds[frame_id] = [x0, x1, y0, y1]
+            frame_bounds[frame_id] = box
             frame += 1
     # Rather than save each individual frame and running those each through the Cloud Vision OCR,
     # I may be able to just compare these bounding boxes to the bounding polys from the OCR to determine
     # which frame they're in (cutting the number of API requests down by more than a factor of 3).
 
-split_frames('comics/0753_purina.jpg')
+    return frame_bounds
+
+
+#print(split_frames('comics/0753_purina.jpg'))
