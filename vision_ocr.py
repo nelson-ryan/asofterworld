@@ -2,7 +2,7 @@
 """
 Created on Tue Oct 27 12:24:39 2020
 
-@author: xople
+@author: nelsonr
 
 Testing the Google Cloud Vision API for OCR
 """
@@ -13,7 +13,8 @@ import io
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "nomadic-zoo-293819-8ccfdaa58681.json"
 
-path = "comics/0702_graverobber.jpg"
+testpath = "comics/0753_purina.jpg"
+
 
 def detect_text(path):
     """Detects text in the file."""
@@ -29,11 +30,11 @@ def detect_text(path):
     texts = response.text_annotations
 
     # Checking annotation output. This doesn't seem to include whitespace characters, but that shouldn't be an issue
-    print(type(texts))
-    print(texts)
+    #print(type(texts))
+    #print(texts[0])
 
-    print('Texts:')
-    print('\n"{}"'.format(texts[0].description))
+    #print('Texts:')
+    #print('\n"{}"'.format(texts[0].description))
 
     '''
     Within 'texts' are objects for 'description', which is the text that is read,
@@ -50,7 +51,6 @@ def detect_text(path):
                 response.error.message))
 
     # or just return the annotation data like so, to compare bounding vertices outside the function:
-    # return texts
+    return texts
 
-
-detect_text(path)
+print(detect_text(testpath))
