@@ -14,12 +14,13 @@ import requests
 import os  # for directory checking and creation
 
 import comicsplit2
-#import vision_ocr #
+import vision_ocr
+
 
 # UPDATE FIRST COMIC NUMBER IN VARIABLE DECLARATION
 def main():
     comics = []
-    current_comic = 1245
+    current_comic = 1247
     while True:
         got_comic = save_comic(current_comic)
         if got_comic:
@@ -30,7 +31,14 @@ def main():
 
     # Use same destination path stored in dict by save_comic
     for i in range(len(comics)):
-        comicsplit2.split_frames(comics[i].get("save_loc"))
+        print(comics[i])
+        comic_path = comics[i].get("save_loc")
+        print(f'\n{comic_path}')
+        comic_frames = comicsplit2.split_frames(comic_path)
+        print(type(comic_frames["frame_0"]))
+        comic_text = vision_ocr.detect_text(comic_path)
+        print(type(comic_text[0]))
+        print(comic_text[0])
 
 
 def save_comic(n):
