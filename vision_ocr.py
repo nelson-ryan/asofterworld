@@ -2,18 +2,15 @@
 """
 Created on Tue Oct 27 12:24:39 2020
 
-@author: nelsonr
-
-Testing the Google Cloud Vision API for OCR
+@author: nelson-ryan
 """
 
 import os
 from google.cloud import vision
 import io
+import numpy
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "nomadic-zoo-293819-8ccfdaa58681.json"
-
-#testpath = "comics/0753_purina.jpg"
 
 
 def detect_text(path):
@@ -53,8 +50,38 @@ def detect_text(path):
     # or just return the annotation data like so, to compare bounding vertices outside the function:
     return texts
 
-    # TODO Create cv2 contour list from texts coordinates, reference:
-    #  https://stackoverflow.com/questions/14161331/creating-your-own-contour-in-opencv-using-python
-    #  Create new function for this purpose, which will take the output of detect_text (?)
 
-#print(detect_text(testpath))
+# Create cv2 contour list from texts coordinates, reference:
+# https://stackoverflow.com/questions/14161331/creating-your-own-contour-in-opencv-using-python
+
+def text2coords(ocr_output):
+    word_contours = []  # for storing all words
+
+    for text in ocr_output:
+        word_vertices = []  # for storing all vertices for a single word
+        # print(f"\n{text.description}")
+        # print(format(text.bounding_poly.vertices))
+
+        # TODO Change this to producing just a single vertex of the center of the
+        #  box by using the average of the Xs and average of the Ys
+        # Put each pair of vertices into a list pair and add to a list of vertices
+        for vertex in text.bounding_poly.vertices:
+            # Storing individual vertex coordinates for a word
+            word_vertex = [vertex.x, vertex.y]
+            word_vertices.append(word_vertex)
+        # print(f"{text.bounding_poly.vertices[0].x}\t{text.bounding_poly.vertices[0].y}")
+
+        # Convert list to numpy ndarray
+        word_vertices = numpy.array(word_vertices, dtype=numpy.int32)
+        word_contours.append(word_vertices)
+
+    # Also convert final to ndarray
+    word_contours = numpy.array(word_contours, dtype=numpy.int32)
+
+    return word_contours
+
+# test_path = "comics/0753_purina.jpg"
+# texts = detect_text(test_path)
+# print(text2coords(texts))
+
+
