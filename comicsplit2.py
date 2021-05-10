@@ -13,6 +13,9 @@ import os
 
 
 # def split_frames(filename, dest_folder="split-frames/"):
+import cv2.cv2
+
+
 def split_frames(filename):
     # if not os.path.exists(dest_folder):
     #     os.mkdir(dest_folder)
@@ -35,16 +38,18 @@ def split_frames(filename):
         origin = cv2.boundingRect(contour)
         return (origin[1] // tolerance_factor) * cols + origin[0]
 
-    contours.sort(key=lambda y: get_contour_precedence(y, im.shape[0]))
+    contours.sort(key=lambda x: get_contour_precedence(x, im.shape[0]))
 
     # From https://stackoverflow.com/a/56473372 again
     # Look through contours, checking what we found
     frame = 0
     frame_bounds = {}
+    contour_shortlist = []
     for i in range(1, len(contours)):
         area = cv2.contourArea(contours[i])
         # Only consider ones taller than around 100 pixels and wider than about 300 pixels
         if area > 30000:
+            contour_shortlist.append(contours[i])
             # Get cropping box and crop
             rc = cv2.minAreaRect(contours[i])
             box = cv2.boxPoints(rc)
@@ -57,16 +62,31 @@ def split_frames(filename):
             # No longer save the files
             # cv2.imwrite(f'split-test/{title}-{frame:02d}.png', im[y0:y1, x0:x1])
             frame_id = 'frame_' + str(frame)
-            #print(frame_id)
-            #print(type(box))
-            #frame_bounds[frame_id] = [x0, x1, y0, y1]
+            # print(frame_id)
+            # print(type(box))
+            # frame_bounds[frame_id] = [x0, x1, y0, y1]
             frame_bounds[frame_id] = box
             frame += 1
     # Rather than save each individual frame and running those each through the Cloud Vision OCR,
     # I may be able to just compare these bounding boxes to the bounding polys from the OCR to determine
     # which frame they're in (cutting the number of API requests down by more than a factor of 3).
 
-    return frame_bounds
+    print(type(contour_shortlist))
+    print(contour_shortlist)
 
+    # TODO reference for creating contour from coordinates:
+    #  https://stackoverflow.com/questions/14161331/creating-your-own-contour-in-opencv-using-python
 
-#print(split_frames('comics/0753_purina.jpg'))
+    # Visual testing of contour placement
+    cv2.drawContours(im, contour_shortlist, -1, (0, 255, 0), 3)
+    cv2.waitKey(0)
+    cv2.imshow('Contours', im)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    # TODO Return new contour list instead of frame bounds
+    # return frame_bounds
+    return contour_shortlist
+    # TODO Add function to create contour list from OCR output
+
+#split_frames('comics/0753_purina.jpg')
