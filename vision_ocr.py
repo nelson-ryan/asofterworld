@@ -53,4 +53,8 @@ def detect_text(path):
     # or just return the annotation data like so, to compare bounding vertices outside the function:
     return texts
 
+    # TODO Create cv2 contour list from texts coordinates, reference:
+    #  https://stackoverflow.com/questions/14161331/creating-your-own-contour-in-opencv-using-python
+    #  Create new function for this purpose, which will take the output of detect_text (?)
+
 #print(detect_text(testpath))
