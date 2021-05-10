@@ -20,7 +20,7 @@ import vision_ocr
 # UPDATE FIRST COMIC NUMBER IN VARIABLE DECLARATION
 def main():
     comics = []
-    pulling_comic = 1247
+    pulling_comic = 1248
     while True:
         retrieved_comic = save_comic(pulling_comic)
         if retrieved_comic:
@@ -31,15 +31,24 @@ def main():
 
     # Use same destination path stored in dict by save_comic
     for i in range(len(comics)):
-        print(comics[i])
         comic_path = comics[i].get("save_loc")
-        print(f'\n{comic_path}')
+        print(comic_path)
         comic_frames = comicsplit2.split_frames(comic_path)
-        print(type(comic_frames["frame_0"]))
-        comic_text = vision_ocr.detect_text(comic_path)
-        print(type(comic_text[0]))
-        print(comic_text[0])
+        print(type(comic_frames))
+        # for j in comic_frames:
+        #     print(f"{type(j)}")
+        #     for k in j:
+        #         print(f"{type(k)}\t{k}")
+        #         for l in k:
+        #             print(f"{type(l)}\t{l}")
+        ocr_text = vision_ocr.detect_text(comic_path)
+        print(type(ocr_text))
+        print(type(ocr_text[0]))
+        print(ocr_text[0])
+        #for j in range(len(ocr_text[0])):
+        #    print(ocr_text[0][j])
 
+        textcontours = vision_ocr.text2coords(ocr_text)
 
 def save_comic(n):
     comic_dict = {}

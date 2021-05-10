@@ -11,7 +11,6 @@ Created on Wed Oct 28 09:53:37 2020
 import cv2  # OpenCV (opencv-python)
 import os
 
-
 # def split_frames(filename, dest_folder="split-frames/"):
 import cv2.cv2
 
@@ -71,8 +70,8 @@ def split_frames(filename):
     # I may be able to just compare these bounding boxes to the bounding polys from the OCR to determine
     # which frame they're in (cutting the number of API requests down by more than a factor of 3).
 
-    print(type(contour_shortlist))
-    print(contour_shortlist)
+    #print(type(contour_shortlist))
+    #print(contour_shortlist)
 
     # TODO reference for creating contour from coordinates:
     #  https://stackoverflow.com/questions/14161331/creating-your-own-contour-in-opencv-using-python
