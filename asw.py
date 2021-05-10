@@ -20,12 +20,12 @@ import vision_ocr
 # UPDATE FIRST COMIC NUMBER IN VARIABLE DECLARATION
 def main():
     comics = []
-    current_comic = 1247
+    pulling_comic = 1247
     while True:
-        got_comic = save_comic(current_comic)
-        if got_comic:
-            comics.append(got_comic)
-            current_comic += 1
+        retrieved_comic = save_comic(pulling_comic)
+        if retrieved_comic:
+            comics.append(retrieved_comic)
+            pulling_comic += 1
         else:
             break
 
