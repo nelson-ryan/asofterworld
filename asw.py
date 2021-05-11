@@ -12,6 +12,7 @@ Beautiful Soup package.
 import bs4  # beautifulsoup4
 import requests
 import os  # for directory checking and creation
+import cv2
 
 import comicsplit2
 import vision_ocr
@@ -34,22 +35,22 @@ def main():
         comic_path = comics[i].get("save_loc")
         print(comic_path)
         comic_frames = comicsplit2.split_frames(comic_path)
-        print(type(comic_frames))
-        # for j in comic_frames:
-        #     print(f"{type(j)}")
-        #     for k in j:
-        #         print(f"{type(k)}\t{k}")
-        #         for l in k:
-        #             print(f"{type(l)}\t{l}")
         ocr_text = vision_ocr.detect_text(comic_path)
-        print(type(ocr_text))
-        print(type(ocr_text[0]))
-        print(ocr_text[0])
-        #for j in range(len(ocr_text[0])):
-        #    print(ocr_text[0][j])
+        ocr_contours = vision_ocr.text2coords(ocr_text)
 
-        textcontours = vision_ocr.text2coords(ocr_text)
+        # Testing that drawContour successfully places both contour groups
+        img = cv2.imread(comic_path, cv2.IMREAD_UNCHANGED)
+        cv2.drawContours(img, comic_frames, -1, (255, 255, 0), 2)
+        cv2.drawContours(img, ocr_contours, -1, (255, 0, 255), 2)
+        cv2.imshow('Contours', img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
+        # TODO Check for overlap of each OCR contour against the
+        #  frame contours and add the corresponding text accordingly
+
+
+# Get individual comic info and save it to a dictionary
 def save_comic(n):
     comic_dict = {}
     comic_number = n
