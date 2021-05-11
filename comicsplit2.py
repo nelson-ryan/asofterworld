@@ -66,5 +66,6 @@ def split_frames(filename):
 
     # print(type(contour_shortlist))
     # print(contour_shortlist)
-
+    # TODO Rather than use the full contour detail, convert the above
+    #  bounding box into a contour ndarray
     return contour_shortlist

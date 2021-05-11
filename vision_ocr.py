@@ -2,7 +2,7 @@
 """
 Created on Tue Oct 27 12:24:39 2020
 
-@author: nelsonr
+@author: nelson-ryan
 """
 
 import os
@@ -11,8 +11,6 @@ import io
 import numpy
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "nomadic-zoo-293819-8ccfdaa58681.json"
-
-testpath = "comics/0753_purina.jpg"
 
 
 def detect_text(path):
@@ -59,11 +57,13 @@ def detect_text(path):
 def text2coords(ocr_output):
     word_contours = []  # for storing all words
 
-    for text in ocr_output[1:]:  # Ignore the first box, which contains all text
+    for text in ocr_output:
         word_vertices = []  # for storing all vertices for a single word
         # print(f"\n{text.description}")
         # print(format(text.bounding_poly.vertices))
 
+        # TODO Change this to producing just a single vertex of the center of the
+        #  box by using the average of the Xs and average of the Ys
         # Put each pair of vertices into a list pair and add to a list of vertices
         for vertex in text.bounding_poly.vertices:
             # Storing individual vertex coordinates for a word
@@ -80,8 +80,8 @@ def text2coords(ocr_output):
 
     return word_contours
 
-
-#texts = detect_text(testpath)
-#print(text2coords(texts))
+# test_path = "comics/0753_purina.jpg"
+# texts = detect_text(test_path)
+# print(text2coords(texts))
 
 
