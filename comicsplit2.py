@@ -10,6 +10,7 @@ Created on Wed Oct 28 09:53:37 2020
 
 import cv2  # OpenCV (opencv-python)
 import os
+import numpy
 
 import vision_ocr
 
@@ -45,21 +46,29 @@ def split_frames(filename):
         area = cv2.contourArea(contours[i])
         # Only consider ones taller than around 100 pixels and wider than about 300 pixels
         if area > 30000:
-            contour_shortlist.append(contours[i])
+            #print(contours[i])
+            #contour_shortlist.append(contours[i])
             # Get cropping box and crop
-            rc = cv2.minAreaRect(contours[i])
-            box = cv2.boxPoints(rc)
-            Xs = [box[0, 0], box[1, 0], box[2, 0], box[3, 0]]
-            Ys = [box[0, 1], box[1, 1], box[2, 1], box[3, 1]]
-            x0 = int(round(min(Xs)))
-            x1 = int(round(max(Xs)))
-            y0 = int(round(min(Ys)))
-            y1 = int(round(max(Ys)))
-            # No longer save the files
-            # cv2.imwrite(f'split-test/{title}-{frame:02d}.png', im[y0:y1, x0:x1])
-            frame_id = 'frame_' + str(frame)
-            frame_bounds[frame_id] = box
-            frame += 1
+            #rc = cv2.minAreaRect(contours[i])
+            box = cv2.minAreaRect(contours[i])
+            #print(type(box))
+            #print(box)
+            box = cv2.boxPoints(box)
+            print(box)
+            contour_shortlist.append(box)
+            # Xs = [box[0, 0], box[1, 0], box[2, 0], box[3, 0]]
+            # Ys = [box[0, 1], box[1, 1], box[2, 1], box[3, 1]]
+            # x0 = int(round(min(Xs)))
+            # x1 = int(round(max(Xs)))
+            # y0 = int(round(min(Ys)))
+            # y1 = int(round(max(Ys)))
+            # # No longer save the files
+            # # cv2.imwrite(f'split-test/{title}-{frame:02d}.png', im[y0:y1, x0:x1])
+            # frame_id = 'frame_' + str(frame)
+            # frame_bounds[frame_id] = box
+            # frame += 1
+    contour_shortlist = numpy.array(contour_shortlist, dtype=numpy.int32)
+
     # Rather than save each individual frame and running those each through the Cloud Vision OCR,
     # I may be able to just compare these bounding boxes to the bounding polys from the OCR to determine
     # which frame they're in (cutting the number of API requests down by more than a factor of 3).
@@ -69,3 +78,14 @@ def split_frames(filename):
     # TODO Rather than use the full contour detail, convert the above
     #  bounding box into a contour ndarray
     return contour_shortlist
+
+
+test_file = "comics/1248_ruby.jpg"
+test_output = split_frames(test_file)
+print(test_output)
+
+img = cv2.imread(test_file, cv2.IMREAD_UNCHANGED)
+cv2.drawContours(img, test_output, -1, (255, 255, 0), 2)
+cv2.imshow('Contours', img)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
