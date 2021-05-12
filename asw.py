@@ -39,15 +39,17 @@ def main():
         ocr_contours = vision_ocr.text2coords(ocr_text)
 
         # Testing that drawContour successfully places both contour groups
-        img = cv2.imread(comic_path, cv2.IMREAD_UNCHANGED)
-        cv2.drawContours(img, comic_frames, -1, (255, 255, 0), 2)
-        cv2.drawContours(img, ocr_contours, -1, (255, 0, 255), 2)
-        cv2.imshow('Contours', img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        # img = cv2.imread(comic_path, cv2.IMREAD_UNCHANGED)
+        # cv2.drawContours(img, comic_frames, -1, (255, 255, 0), 2)
+        # cv2.drawContours(img, ocr_contours, -1, (255, 0, 255), 2)
+        # cv2.imshow('Contours', img)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
 
         # TODO Check for overlap of each OCR contour against the
         #  frame contours and add the corresponding text accordingly
+        #  Use cv2.pointPolygonTest to achieve this:
+        #  https://docs.opencv.org/3.0-beta/doc/py_tutorials/py_imgproc/py_contours/py_contours_more_functions/py_contours_more_functions.html
 
 
 # Get individual comic info and save it to a dictionary
