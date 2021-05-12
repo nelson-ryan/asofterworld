@@ -25,20 +25,12 @@ def detect_text(path):
 
     response = client.text_detection(image=image)
     texts = response.text_annotations
-
-    # Checking annotation output. This doesn't seem to include whitespace characters, but that shouldn't be an issue
-    #print(type(texts))
-    #print(texts[0])
-
-    #print('Texts:')
     #print('\n"{}"'.format(texts[0].description))
 
     '''
     Within 'texts' are objects for 'description', which is the text that is read,
     and appears to be separated by word, and also includes new lines.
     These are an EntityAnnotation type, but can be converted to str()
-    
-    So I think I can just convert to string and return the result to the main function
     '''
 
     if response.error.message:
@@ -47,7 +39,6 @@ def detect_text(path):
             'https://cloud.google.com/apis/design/errors'.format(
                 response.error.message))
 
-    # or just return the annotation data like so, to compare bounding vertices outside the function:
     return texts
 
 
