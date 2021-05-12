@@ -25,20 +25,12 @@ def detect_text(path):
 
     response = client.text_detection(image=image)
     texts = response.text_annotations
-
-    # Checking annotation output. This doesn't seem to include whitespace characters, but that shouldn't be an issue
-    #print(type(texts))
-    #print(texts[0])
-
-    #print('Texts:')
     #print('\n"{}"'.format(texts[0].description))
 
     '''
     Within 'texts' are objects for 'description', which is the text that is read,
     and appears to be separated by word, and also includes new lines.
     These are an EntityAnnotation type, but can be converted to str()
-    
-    So I think I can just convert to string and return the result to the main function
     '''
 
     if response.error.message:
@@ -47,7 +39,6 @@ def detect_text(path):
             'https://cloud.google.com/apis/design/errors'.format(
                 response.error.message))
 
-    # or just return the annotation data like so, to compare bounding vertices outside the function:
     return texts
 
 
@@ -56,32 +47,39 @@ def detect_text(path):
 
 def text2coords(ocr_output):
     word_contours = []  # for storing all words
+    word_points = []
 
     for text in ocr_output:
         word_vertices = []  # for storing all vertices for a single word
+        word_Xs = []
+        word_Ys = []
         # print(f"\n{text.description}")
         # print(format(text.bounding_poly.vertices))
 
-        # TODO Change this to producing just a single vertex of the center of the
-        #  box by using the average of the Xs and average of the Ys
         # Put each pair of vertices into a list pair and add to a list of vertices
         for vertex in text.bounding_poly.vertices:
             # Storing individual vertex coordinates for a word
             word_vertex = [vertex.x, vertex.y]
             word_vertices.append(word_vertex)
+            word_Xs.append(vertex.x)
+            word_Ys.append(vertex.y)
         # print(f"{text.bounding_poly.vertices[0].x}\t{text.bounding_poly.vertices[0].y}")
-
+        point_X = int(sum(word_Xs)/len(word_Xs))
+        point_Y = int(sum(word_Ys)/len(word_Ys))
+        point = [point_X, point_Y]
         # Convert list to numpy ndarray
         word_vertices = numpy.array(word_vertices, dtype=numpy.int32)
         word_contours.append(word_vertices)
+        word_points.append(point)
 
     # Also convert final to ndarray
     word_contours = numpy.array(word_contours, dtype=numpy.int32)
 
-    return word_contours
-
-# test_path = "comics/0753_purina.jpg"
-# texts = detect_text(test_path)
-# print(text2coords(texts))
+    return word_contours, word_points
 
 
+
+# t = detect_text("comics/1248_ruby.jpg")
+# print(type(text2coords(t)))
+# for i in text2coords(t):
+#     print(i)
