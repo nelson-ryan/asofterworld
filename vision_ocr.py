@@ -78,10 +78,9 @@ def text2coords(ocr_output):
     # Also convert final to ndarray
     word_contours = numpy.array(word_contours, dtype=numpy.int32)
 
+    # TODO Change output to list with all word strings and their corresponding
+    #  center-point coordinates- possibility: [ (word, (x, y) ), (word2, (x, y) ) ]
     return word_contours
 
-# test_path = "comics/0753_purina.jpg"
-# texts = detect_text(test_path)
-# print(text2coords(texts))
 
 
