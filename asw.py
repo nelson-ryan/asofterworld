@@ -21,7 +21,7 @@ import vision_ocr
 # UPDATE FIRST COMIC NUMBER IN VARIABLE DECLARATION
 def main():
     comics = []
-    pulling_comic = 1248
+    pulling_comic = 1247
     while True:
         retrieved_comic = save_comic(pulling_comic)
         if retrieved_comic:
@@ -36,13 +36,15 @@ def main():
         print(comic_path)
         comic_frames = comicsplit2.split_frames(comic_path)
         ocr_text = vision_ocr.detect_text(comic_path)
-        ocr_contours = vision_ocr.text2coords(ocr_text)
+        ocr_contours, ocr_points = vision_ocr.text2coords(ocr_text)
 
         # Testing that drawContour successfully places both contour groups
         # img = cv2.imread(comic_path, cv2.IMREAD_UNCHANGED)
         # cv2.drawContours(img, comic_frames, -1, (255, 255, 0), 2)
         # cv2.drawContours(img, ocr_contours, -1, (255, 0, 255), 2)
-        # cv2.imshow('Contours', img)
+        # for point in ocr_points:
+        #     cv2.circle(img, tuple(point), radius=3, color=(0, 255, 0), thickness=3)
+        # cv2.imshow('circle', img)
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
 
