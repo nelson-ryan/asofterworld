@@ -52,6 +52,16 @@ def main():
         #  frame contours and add the corresponding text accordingly
         #  Use cv2.pointPolygonTest to achieve this:
         #  https://docs.opencv.org/3.0-beta/doc/py_tutorials/py_imgproc/py_contours/py_contours_more_functions/py_contours_more_functions.html
+        text_by_frame = []
+        for j in range(len(frame_contours)):
+            text_by_frame.append([])
+            for k in range(1, len(ocr_points)):
+                # Check if text is inside frame; pointPolygonTest returns 1 if yes (-1 if no, 0 if eq)
+                if cv2.pointPolygonTest(frame_contours[j],
+                                        tuple(ocr_points[k]),
+                                        False) > 0:
+                    text_by_frame[j].append(ocr_text[k].description)
+        print(text_by_frame)
 
 
 # Get individual comic info and save it to a dictionary
