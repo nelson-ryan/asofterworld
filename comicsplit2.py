@@ -12,7 +12,7 @@ import cv2  # OpenCV (opencv-python)
 import numpy
 
 
-def split_frames(filename):
+def find_frames(filename):
     # Load image
     im = cv2.imread(filename, cv2.IMREAD_UNCHANGED)
 
@@ -20,7 +20,6 @@ def split_frames(filename):
     gr = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
     # Threshold to get black and white
     _, grthresh = cv2.threshold(gr, 230, 255, cv2.THRESH_BINARY)
-
     # Find contours
     contours, hierarchy = cv2.findContours(grthresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -45,9 +44,5 @@ def split_frames(filename):
             contour_shortlist.append(box)
     # Convert entire list to contour array
     contour_shortlist = numpy.array(contour_shortlist, dtype=numpy.int32)
-
-    # Rather than save each individual frame and running those each through the Cloud Vision OCR,
-    # I may be able to just compare these bounding boxes to the bounding polys from the OCR to determine
-    # which frame they're in (cutting the number of API requests down by more than a factor of 3).
 
     return contour_shortlist

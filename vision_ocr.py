@@ -16,22 +16,15 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "nomadic-zoo-293819-8ccfdaa58681.
 def detect_text(path):
     """Detects text in the file."""
 
-    client = vision.ImageAnnotatorClient()
-
     with io.open(path, 'rb') as image_file:
         content = image_file.read()
-
     image = vision.Image(content=content)
 
+    client = vision.ImageAnnotatorClient()
     response = client.text_detection(image=image)
     texts = response.text_annotations
     #print('\n"{}"'.format(texts[0].description))
-
-    '''
-    Within 'texts' are objects for 'description', which is the text that is read,
-    and appears to be separated by word, and also includes new lines.
-    These are an EntityAnnotation type, but can be converted to str()
-    '''
+    # Keeping this print line here to reference the description object
 
     if response.error.message:
         raise Exception(
