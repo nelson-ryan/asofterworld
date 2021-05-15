@@ -9,15 +9,10 @@ Created on Wed Oct 28 09:53:37 2020
 # solution to ordering from https://stackoverflow.com/a/39445901
 
 import cv2  # OpenCV (opencv-python)
-import os
+import numpy
 
 
-# def split_frames(filename, dest_folder="split-frames/"):
 def split_frames(filename):
-    # if not os.path.exists(dest_folder):
-    #     os.mkdir(dest_folder)
-    # title = filename.split(sep="/")[-1].split(sep=".")[-2]
-
     # Load image
     im = cv2.imread(filename, cv2.IMREAD_UNCHANGED)
 
@@ -35,38 +30,24 @@ def split_frames(filename):
         origin = cv2.boundingRect(contour)
         return (origin[1] // tolerance_factor) * cols + origin[0]
 
-    contours.sort(key=lambda y: get_contour_precedence(y, im.shape[0]))
+    contours.sort(key=lambda x: get_contour_precedence(x, im.shape[0]))
 
-    # From https://stackoverflow.com/a/56473372 again
+    # From https://stackoverflow.com/a/56473372 again (not really applicable anymore)
     # Look through contours, checking what we found
-    frame = 0
-    frame_bounds = {}
+    contour_shortlist = []
+    # Include only contours with sufficient area
     for i in range(1, len(contours)):
         area = cv2.contourArea(contours[i])
         # Only consider ones taller than around 100 pixels and wider than about 300 pixels
         if area > 30000:
-            # Get cropping box and crop
-            rc = cv2.minAreaRect(contours[i])
-            box = cv2.boxPoints(rc)
-            Xs = [box[0, 0], box[1, 0], box[2, 0], box[3, 0]]
-            Ys = [box[0, 1], box[1, 1], box[2, 1], box[3, 1]]
-            x0 = int(round(min(Xs)))
-            x1 = int(round(max(Xs)))
-            y0 = int(round(min(Ys)))
-            y1 = int(round(max(Ys)))
-            # No longer save the files
-            # cv2.imwrite(f'split-test/{title}-{frame:02d}.png', im[y0:y1, x0:x1])
-            frame_id = 'frame_' + str(frame)
-            #print(frame_id)
-            #print(type(box))
-            #frame_bounds[frame_id] = [x0, x1, y0, y1]
-            frame_bounds[frame_id] = box
-            frame += 1
+            box = cv2.minAreaRect(contours[i])  # Get minimal points instead of all
+            box = cv2.boxPoints(box)  # Converts tuple to contour ndarray
+            contour_shortlist.append(box)
+    # Convert entire list to contour array
+    contour_shortlist = numpy.array(contour_shortlist, dtype=numpy.int32)
+
     # Rather than save each individual frame and running those each through the Cloud Vision OCR,
     # I may be able to just compare these bounding boxes to the bounding polys from the OCR to determine
     # which frame they're in (cutting the number of API requests down by more than a factor of 3).
 
-    return frame_bounds
-
-
-#print(split_frames('comics/0753_purina.jpg'))
+    return contour_shortlist
