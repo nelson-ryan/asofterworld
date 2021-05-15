@@ -33,11 +33,11 @@ def main():
     # Use same destination path stored in dict by save_comic
     for i in range(len(comics)):
         comic_path = comics[i].get("save_loc")
-        print(comic_path)
+        # print(comic_path)
         frame_contours = comicsplit2.find_frames(comic_path)
         ocr_text = vision_ocr.detect_text(comic_path)
         ocr_contours, ocr_points = vision_ocr.text2coords(ocr_text)
-        '''All of these ocr_* are convoluted; this might be a ideal place to use a class'''
+        '''All of these ocr_ things are convoluted; this might be an ideal place to use a class'''
         # Testing that drawContour successfully places both contour groups
         # img = cv2.imread(comic_path, cv2.IMREAD_UNCHANGED)
         # cv2.drawContours(img, frame_contours, -1, (255, 255, 0), 2)
@@ -48,35 +48,36 @@ def main():
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
 
-        # TODO Check for overlap of each OCR contour against the
-        #  frame contours and add the corresponding text accordingly
-        #  Use cv2.pointPolygonTest to achieve this:
-        #  https://docs.opencv.org/3.0-beta/doc/py_tutorials/py_imgproc/py_contours/py_contours_more_functions/py_contours_more_functions.html
+        # Check for word location within frame contours, add corresponding text accordingly
         text_by_frame = []
         for j in range(len(frame_contours)):
             text_by_frame.append([])
             for k in range(1, len(ocr_points)):
-                # Check if text is inside frame; pointPolygonTest returns 1 if yes (-1 if no, 0 if eq)
-                if cv2.pointPolygonTest(frame_contours[j],
-                                        tuple(ocr_points[k]),
-                                        False) > 0:
+                # Check if text is inside frame; pointPolygonTest returns 1 if yes
+                if cv2.pointPolygonTest(contour=frame_contours[j],
+                                        pt=tuple(ocr_points[k]),
+                                        measureDist=False) > 0:
                     text_by_frame[j].append(ocr_text[k].description)
-        print(text_by_frame)
+            # Join separate list items into a single string
+            text_by_frame[j] = ' '.join(text_by_frame[j])
+        # get rid of empty strings for frames without text
+        text_by_frame[:] = [x for x in text_by_frame if x != '']
+        # for frame in text_by_frame:
+        #     print(frame)
+        # print(end='\n')
 
 
 # Get individual comic info and save it to a dictionary
 def save_comic(n):
     comic_dict = {}
     comic_number = n
+
     res = requests.get(f'https://www.asofterworld.com/index.php?id={comic_number}')
     res.raise_for_status()
-    
     soup = bs4.BeautifulSoup(res.text, "html.parser")
     comic = soup.select("#comicimg > img")
-    
     url = comic[0].get('src')
-
-    filename = url.split('/')[-1] # filename is last part of URL, following the last slash
+    filename = url.split('/')[-1]  # filename is last part of URL, following the last slash
     # If there's no filename, there's no comic, so stop
     if not filename:
         return
@@ -87,8 +88,10 @@ def save_comic(n):
     if not os.path.exists('comics/'):
         os.mkdir('comics/')
     save_loc = f'comics/{comic_number:04d}_{filename}'
-    with open(save_loc, 'wb') as img:
-        img.write(img_url.content)
+    # no need to save it if it's already there
+    if not os.path.exists(save_loc):
+        with open(save_loc, 'wb') as img:
+            img.write(img_url.content)
 
     # These could well also be class attributes
     comic_dict["comic_number"] = comic_number
