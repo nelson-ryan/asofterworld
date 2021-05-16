@@ -3,20 +3,18 @@
 Created on Tue Oct 20 11:21:20 2020
 @author: nelson-ryan
 
-This section of code defines a function to download and save
-all A Softer World comics from the website, utilizing the
-Beautiful Soup package.
-
 """
 
 import bs4  # beautifulsoup4
 import requests
 import os  # for directory checking and creation
 import cv2
+import numpy
+import io
+from google.cloud import vision
 
-import comicsplit2
-import vision_ocr
-
+# Google Vision credential
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "nomadic-zoo-293819-8ccfdaa58681.json"
 
 # UPDATE FIRST COMIC NUMBER IN VARIABLE DECLARATION
 def main():
@@ -34,13 +32,13 @@ def main():
     # Use same destination path stored in dict by save_comic
     for comic in comics:
         comic_path = comics[comic].get("save_loc")
-        # print(comic_path)
-        frame_contours = comicsplit2.find_frames(comic_path)
-        ocr_text = vision_ocr.detect_text(comic_path)
-        ocr_contours, ocr_points = vision_ocr.text2coords(ocr_text)
+        
+        frame_contours = find_frames(comic_path)
+        ocr_text = detect_text(comic_path)
+        ocr_contours, ocr_points = text2coords(ocr_text)
         '''All of these ocr_ things are convoluted; this might be an ideal place to use a class'''
 
-        # drawTest(comic_path, frame_contours, ocr_contours, ocr_points)
+        drawTest(comic_path, frame_contours, ocr_contours, ocr_points)
 
         text_by_frame = group_frame_text(frames=frame_contours,
                                          text_points=ocr_points,
@@ -82,6 +80,100 @@ def save_comic(n, save_dest_folder='comics'):
     comic_dict["frame_text"] = []
 
     return comic_dict
+
+
+def find_frames(filename):
+    # Load image
+    im = cv2.imread(filename, cv2.IMREAD_UNCHANGED)
+
+    # Create greyscale version
+    gr = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    # Threshold to get black and white
+    _, grthresh = cv2.threshold(gr, 230, 255, cv2.THRESH_BINARY)
+    # Find contours
+    contours, hierarchy = cv2.findContours(grthresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+    # This function comes from https://stackoverflow.com/a/39445901
+    def get_contour_precedence(contour, cols):
+        tolerance_factor = 50
+        origin = cv2.boundingRect(contour)
+        return (origin[1] // tolerance_factor) * cols + origin[0]
+
+    contours.sort(key=lambda x: get_contour_precedence(x, im.shape[0]))
+
+    # Basis from https://stackoverflow.com/a/56473372 (heavily gutted, so not so applicable anymore)
+    # Look through contours, checking what we found
+    contour_shortlist = []
+    # Include only contours with sufficient area
+    for i in range(1, len(contours)):
+        area = cv2.contourArea(contours[i])
+        # Only consider ones taller than around 100 pixels and wider than about 300 pixels
+        if area > 30000:
+            box = cv2.minAreaRect(contours[i])  # Get minimal points instead of all
+            box = cv2.boxPoints(box)  # Converts tuple to contour ndarray
+            contour_shortlist.append(box)
+    # Convert entire list to contour array
+    contour_shortlist = numpy.array(contour_shortlist, dtype=numpy.int32)
+
+    return contour_shortlist
+
+
+def detect_text(path):
+    """Detects text in the file."""
+
+    with io.open(path, 'rb') as image_file:
+        content = image_file.read()
+    image = vision.Image(content=content)
+
+    client = vision.ImageAnnotatorClient()
+    response = client.text_detection(image=image)
+    texts = response.text_annotations
+    #print('\n"{}"'.format(texts[0].description))
+    # Keeping this print line here to reference the description object
+
+    if response.error.message:
+        raise Exception(
+            '{}\nFor more info on error messages, check: '
+            'https://cloud.google.com/apis/design/errors'.format(
+                response.error.message))
+
+    return texts
+
+
+def text2coords(ocr_output):
+    # Create cv2 contour list from texts coordinates, reference:
+    # https://stackoverflow.com/questions/14161331/creating-your-own-contour-in-opencv-using-python
+
+    word_contours = []  # for storing all words
+    word_points = []
+
+    for text in ocr_output:
+        word_vertices = []  # for storing all vertices for a single word
+        word_Xs = []
+        word_Ys = []
+        # print(f"\n{text.description}")
+        # print(format(text.bounding_poly.vertices))
+
+        # Put each pair of vertices into a list pair and add to a list of vertices
+        for vertex in text.bounding_poly.vertices:
+            # Storing individual vertex coordinates for a word
+            word_vertex = [vertex.x, vertex.y]
+            word_vertices.append(word_vertex)
+            word_Xs.append(vertex.x)
+            word_Ys.append(vertex.y)
+        # print(f"{text.bounding_poly.vertices[0].x}\t{text.bounding_poly.vertices[0].y}")
+        point_X = int(sum(word_Xs)/len(word_Xs))
+        point_Y = int(sum(word_Ys)/len(word_Ys))
+        point = [point_X, point_Y]
+        # Convert list to numpy ndarray
+        word_vertices = numpy.array(word_vertices, dtype=numpy.int32)
+        word_contours.append(word_vertices)
+        word_points.append(point)
+
+    # Also convert final to ndarray
+    word_contours = numpy.array(word_contours, dtype=numpy.int32)
+
+    return word_contours, word_points
 
 
 def drawTest(comic_path, frame_contours, ocr_contours, ocr_points):
