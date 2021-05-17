@@ -5,31 +5,38 @@ Created on Tue Oct 20 11:21:20 2020
 
 """
 
-import bs4  # beautifulsoup4
-import requests
+import io
 import os  # for directory checking and creation
+import requests
+import bs4  # beautifulsoup4
 import cv2
 import numpy
-import io
 from google.cloud import vision
+import json
 
 # Google Vision credential
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "nomadic-zoo-293819-8ccfdaa58681.json"
 
 # UPDATE FIRST COMIC NUMBER IN VARIABLE DECLARATION
 def main():
-    comics = {}
-    pulling_comic = 1247
-    while True:
-        retrieved_comic = save_comic(pulling_comic)
-        if retrieved_comic:
-            comics[f'comic_{pulling_comic}'] = retrieved_comic
-            #comics.append(retrieved_comic)
-            pulling_comic += 1
-        else:
-            break
+# TODO Make the comics object global so that save_comic() can check both it and
+#  the image file for whether it should pull either
+    if os.path.exists('comics.json'):
+        with open('comics.json', 'r') as read_file:
+            comics = json.load(read_file)
+    else:
+        comics = {}
+        pulling_comic = 1247
+        while True:
+            retrieved_comic = save_comic(pulling_comic)
+            if retrieved_comic:
+                comics[f'comic_{pulling_comic}'] = retrieved_comic
+                #comics.append(retrieved_comic)
+                pulling_comic += 1
+            else:
+                break
 
-    # Use same destination path stored in dict by save_comic
+    # Iterate through each saved comic to read in OCR
     for comic in comics:
         comic_path = comics[comic].get("save_loc")
         
@@ -45,6 +52,8 @@ def main():
                                          text=ocr_text)
         comics[comic]["frame_text"] = text_by_frame
 
+    with open('comics.json', 'w') as write_file:
+        json.dump(comics, write_file)
 
 # Get individual comic info and save it to a dictionary
 def save_comic(n, save_dest_folder='comics'):
