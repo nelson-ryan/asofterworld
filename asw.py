@@ -19,38 +19,51 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "nomadic-zoo-293819-8ccfdaa58681.
 
 # UPDATE FIRST COMIC NUMBER IN VARIABLE DECLARATION
 def main():
-# TODO Make the comics object global so that save_comic() can check both it and
-#  the image file for whether it should pull either
+# TODO Check for both comic data and image file to determine whether to pull either
+#  (presently it does not download image if data is present) 
+
+    # If json data already exists, load it; else, initialize for pull from web
     if os.path.exists('comics.json'):
         with open('comics.json', 'r') as read_file:
             comics = json.load(read_file)
     else:
         comics = {}
-        pulling_comic = 1247
-        while True:
+    
+    # For each comic in range, first check if data already present before pull
+    pulling_comic = 1240
+    while True:
+        comicdictkey = f'comic_{pulling_comic}'
+        if comicdictkey not in comics:
             retrieved_comic = save_comic(pulling_comic)
             if retrieved_comic:
-                comics[f'comic_{pulling_comic}'] = retrieved_comic
-                #comics.append(retrieved_comic)
+                comics[comicdictkey] = retrieved_comic
+                # print(f'Grabbed #{pulling_comic}')
                 pulling_comic += 1
             else:
                 break
+        else:
+            # print(f'Skipped #{pulling_comic}')
+            pulling_comic += 1
 
     # Iterate through each saved comic to read in OCR
     for comic in comics:
-        comic_path = comics[comic].get("save_loc")
-        
-        frame_contours = find_frames(comic_path)
-        ocr_text = detect_text(comic_path)
-        ocr_contours, ocr_points = text2coords(ocr_text)
-        '''All of these ocr_ things are convoluted; this might be an ideal place to use a class'''
+        if "frame_text" not in comics[comic]:
+            comic_path = comics[comic].get("save_loc")
+            
+            frame_contours = find_frames(comic_path)
+            ocr_text = detect_text(comic_path)
+            ocr_contours, ocr_points = text2coords(ocr_text)
+            '''All of these ocr_ things are convoluted; this might be an ideal place to use a class'''
 
-        drawTest(comic_path, frame_contours, ocr_contours, ocr_points)
+            #drawTest(comic_path, frame_contours, ocr_contours, ocr_points)
 
-        text_by_frame = group_frame_text(frames=frame_contours,
-                                         text_points=ocr_points,
-                                         text=ocr_text)
-        comics[comic]["frame_text"] = text_by_frame
+            text_by_frame = group_frame_text(frames=frame_contours,
+                                            text_points=ocr_points,
+                                            text=ocr_text)
+            comics[comic]["frame_text"] = text_by_frame
+            # print(f'Ran OCR for {comic}')
+        # else:
+            # print(f'Skipped OCR for {comic}')
 
     with open('comics.json', 'w') as write_file:
         json.dump(comics, write_file)
@@ -66,9 +79,9 @@ def save_comic(n, save_dest_folder='comics'):
     comic = soup.select("#comicimg > img")
     url = comic[0].get('src')
     filename = url.split('/')[-1]  # filename is last part of URL, following the last slash
-    # If there's no filename, there's no comic, so stop
+    
     if not filename:
-        return
+        return # If there's no filename, there's no comic, so stop
     alt_text = comic[0].get('title')
 
     img_url = requests.get(url)
@@ -86,7 +99,6 @@ def save_comic(n, save_dest_folder='comics'):
     comic_dict["filename"] = filename
     comic_dict["alt_text"] = alt_text
     comic_dict["save_loc"] = save_loc
-    comic_dict["frame_text"] = []
 
     return comic_dict
 
