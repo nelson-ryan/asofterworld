@@ -102,13 +102,15 @@ def save_comic(n, save_dest_folder='comics'):
 
     return comic_dict
 
-
 def find_frames(filename):
     # Load image
     im = cv2.imread(filename, cv2.IMREAD_UNCHANGED)
-
-    # Create greyscale version
-    gr = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    
+    # Create greyscale version--only if it has a color layer (not already only grey)
+    if len(im.shape) == 3:  # shape is rows, columns, and channels (if color)
+        gr = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    elif len(im.shape) == 2:  # shape as no channels count if no color
+        gr = im
     # Threshold to get black and white
     _, grthresh = cv2.threshold(gr, 230, 255, cv2.THRESH_BINARY)
     # Find contours
