@@ -10,7 +10,7 @@ import os  # for directory checking and creation
 import requests
 import bs4  # beautifulsoup4
 import cv2
-import numpy
+import numpy as np
 from google.cloud import vision
 import json
 
@@ -19,8 +19,9 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "nomadic-zoo-293819-8ccfdaa58681.
 
 # UPDATE FIRST COMIC NUMBER IN VARIABLE DECLARATION
 def main():
-# TODO Check for both comic data and image file to determine whether to pull either
-#  (presently it does not download image if data is present) 
+    first_comic = 1246
+    # TODO Check for both comic data and image file to determine whether to pull either
+    #  (presently it does not download image if data is present) 
 
     # If json data already exists, load it; else, initialize for pull from web
     if os.path.exists('comics.json'):
@@ -30,20 +31,19 @@ def main():
         comics = {}
     
     # For each comic in range, first check if data already present before pull
-    pulling_comic = 1240
+    pulling_comic = first_comic
     while True:
         comicdictkey = f'comic_{pulling_comic}'
         if comicdictkey not in comics:
             retrieved_comic = save_comic(pulling_comic)
             if retrieved_comic:
                 comics[comicdictkey] = retrieved_comic
-                # print(f'Grabbed #{pulling_comic}')
-                pulling_comic += 1
+                print(f'Grabbed #{pulling_comic}')
             else:
                 break
         else:
-            # print(f'Skipped #{pulling_comic}')
-            pulling_comic += 1
+            print(f'Skipped #{pulling_comic}')
+        pulling_comic += 1
 
     # Iterate through each saved comic to read in OCR
     for comic in comics:
@@ -53,17 +53,17 @@ def main():
             frame_contours = find_frames(comic_path)
             ocr_text = detect_text(comic_path)
             ocr_contours, ocr_points = text2coords(ocr_text)
-            '''All of these ocr_ things are convoluted; this might be an ideal place to use a class'''
+            '''All of these ocr_* things are convoluted; this might be an ideal place to use a class'''
 
-            #drawTest(comic_path, frame_contours, ocr_contours, ocr_points)
+            # drawTest(comic_path, frame_contours, ocr_contours, ocr_points)
 
             text_by_frame = group_frame_text(frames=frame_contours,
                                             text_points=ocr_points,
                                             text=ocr_text)
             comics[comic]["frame_text"] = text_by_frame
-            # print(f'Ran OCR for {comic}')
-        # else:
-            # print(f'Skipped OCR for {comic}')
+            print(f'Ran OCR for {comic}')
+        else:
+            print(f'Skipped OCR for {comic}')
 
     with open('comics.json', 'w') as write_file:
         json.dump(comics, write_file)
@@ -112,7 +112,7 @@ def find_frames(filename):
     # Threshold to get black and white
     _, grthresh = cv2.threshold(gr, 230, 255, cv2.THRESH_BINARY)
     # Find contours
-    contours, hierarchy = cv2.findContours(grthresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(grthresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
     # This function comes from https://stackoverflow.com/a/39445901
     def get_contour_precedence(contour, cols):
@@ -122,19 +122,20 @@ def find_frames(filename):
 
     contours.sort(key=lambda x: get_contour_precedence(x, im.shape[0]))
 
-    # Basis from https://stackoverflow.com/a/56473372 (heavily gutted, so not so applicable anymore)
-    # Look through contours, checking what we found
+    # Basis from https://stackoverflow.com/a/56473372 (now heavily gutted, though):
+    # Create empty list for contours of frames
     contour_shortlist = []
-    # Include only contours with sufficient area
+    # Identify frames by including only contours with sufficient area
     for i in range(1, len(contours)):
         area = cv2.contourArea(contours[i])
-        # Only consider ones taller than around 100 pixels and wider than about 300 pixels
-        if area > 30000:
+        # TODO Test if this threshold leaves any false negatives/positives by checking
+        #  1) frames are multiples of three and 2) all OCR words are in exactly one frame
+        if area > 50000:
             box = cv2.minAreaRect(contours[i])  # Get minimal points instead of all
             box = cv2.boxPoints(box)  # Converts tuple to contour ndarray
             contour_shortlist.append(box)
-    # Convert entire list to contour array
-    contour_shortlist = numpy.array(contour_shortlist, dtype=numpy.int32)
+    # Convert entire list to contour ndarray
+    contour_shortlist = np.array(contour_shortlist, dtype=np.int32)
 
     return contour_shortlist
 
@@ -186,13 +187,13 @@ def text2coords(ocr_output):
         point_X = int(sum(word_Xs)/len(word_Xs))
         point_Y = int(sum(word_Ys)/len(word_Ys))
         point = [point_X, point_Y]
-        # Convert list to numpy ndarray
-        word_vertices = numpy.array(word_vertices, dtype=numpy.int32)
+        # Convert list to contour ndarray
+        word_vertices = np.array(word_vertices, dtype=np.int32)
         word_contours.append(word_vertices)
         word_points.append(point)
 
-    # Also convert final to ndarray
-    word_contours = numpy.array(word_contours, dtype=numpy.int32)
+    # Also convert final to contour ndarray
+    word_contours = np.array(word_contours, dtype=np.int32)
 
     return word_contours, word_points
 
