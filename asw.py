@@ -5,14 +5,9 @@ Created on Tue Oct 20 11:21:20 2020
 
 """
 
-import io
-import os  # for directory checking and creation
-import requests
-import bs4  # beautifulsoup4
-import cv2
+import io, os, json, requests, bs4, cv2
 import numpy as np
 from google.cloud import vision
-import json
 
 # Google Vision credential
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "nomadic-zoo-293819-8ccfdaa58681.json"
@@ -230,4 +225,4 @@ if __name__ == '__main__':
             print(f'Skipped OCR for {comic}')
 
     with open('comics.json', 'w') as write_file:
-        json.dump(comics, write_file)
+        json.dump(comics, write_file, sort_keys=True)
