@@ -62,13 +62,24 @@ class Comic:
     ### OCR ###
 
     def find_frames(self):
-        
+
         # Load locally-saved image
         im = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
         
+        # Check if image is missing final image data (as is the case with #363,
+        # which causes errors with OCR, so this may be better to do there...)
+        # Solution adapted from https://stackoverflow.com/a/68918602/12662447
+        with open(self.save_loc, 'rb') as imgopen:
+            imgopen.seek(-2,2)
+            # If so, overwrite and re-read image file
+            if imgopen.read() != b'\xff\xd9':
+                cv2.imwrite(str(self.save_loc), im)
+                im = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
+
+        
         # Create greyscale version
         # IF it has a color layer (i.e. not already only grey)
-        if len(im.shape) == 3: # shape is rows, columns, and channels (if color)
+        if len(im.shape) == 3: # shape is rows, columns, channels (if color)
             gr = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
         elif len(im.shape) == 2:  # shape has no 'channels' value if not color
             gr = im
@@ -94,11 +105,15 @@ class Comic:
         # Identify frames by including only contours with sufficient area
         for i in range(1, len(contours)):
             area = cv2.contourArea(contours[i])
-            # TODO Test if this threshold leaves any false negatives/positives by checking
-            #  1) frames are multiples of three and 2) all OCR words are in exactly one frame
+            # TODO Test if this threshold leaves any false negatives/positives:
+            #  1) check whether frames are multiples of three and
+            #  2) check that all OCR words are in exactly one frame
             if area > 50000:
-                box = cv2.minAreaRect(contours[i])  # Get minimal points instead of all
-                box = cv2.boxPoints(box)  # Converts tuple to contour ndarray
+                # Get minimal points instead of all
+                box = cv2.minAreaRect(contours[i])
+                # Convert tuple to contour ndarray
+                box = cv2.boxPoints(box)
+                # Add to output
                 contour_shortlist.append(box)
         # Convert entire list to contour ndarray
         contour_shortlist = np.array(contour_shortlist, dtype=np.int32)
@@ -137,7 +152,7 @@ class Comic:
             word_Xs = []
             word_Ys = []
 
-            # Put each pair of vertices into a list pair and add to a list of vertices
+            # Put each vertex pair into a list pair & add to a list of vertices
             for vertex in text.bounding_poly.vertices:
                 # Storing individual vertex coordinates for a word
                 word_vertex = [vertex.x, vertex.y]
@@ -157,13 +172,13 @@ class Comic:
 
         return word_contours, word_points
 
-    # Check for word location within frame contours, add corresponding text accordingly
+    # Check for word location within frame contours, add corresponding text
     def group_frame_text(self):
         text_by_frame = []
         for j in range(len(self.frame_contours)):
             text_by_frame.append([])
             for k in range(1, len(self.ocr_points)):
-                # Check if text is inside frame; pointPolygonTest returns 1 if yes
+                # Check if text is inside frame; pointPolygonTest 1 if yes
                 if cv2.pointPolygonTest(contour=self.frame_contours[j],
                                         pt=tuple(self.ocr_points[k]),
                                         measureDist=False) > 0:
@@ -180,7 +195,12 @@ class Comic:
         cv2.drawContours(img, self.frame_contours, -1, (255, 255, 0), 2)
         cv2.drawContours(img, self.ocr_contours, -1, (255, 0, 255), 2)
         for point in self.ocr_points:
-            cv2.circle(img, tuple(point), radius=3, color=(0, 255, 0), thickness=3)
+            cv2.circle(img,
+                       tuple(point),
+                       radius=3,
+                       color=(0, 255, 0),
+                       thickness=3
+            )
         cv2.imshow('circle', img)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
