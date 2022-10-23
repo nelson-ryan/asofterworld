@@ -172,16 +172,16 @@ class Comic:
         text_by_frame[:] = [x for x in text_by_frame if x != '']
         return text_by_frame
 
-def drawTest(comic):
-    # Testing that drawContour successfully places both contour groups
-    img = cv2.imread(str(comic.save_loc), cv2.IMREAD_UNCHANGED)
-    cv2.drawContours(img, comic.frame_contours, -1, (255, 255, 0), 2)
-    cv2.drawContours(img, comic.ocr_contours, -1, (255, 0, 255), 2)
-    for point in comic.ocr_points:
-        cv2.circle(img, tuple(point), radius=3, color=(0, 255, 0), thickness=3)
-    cv2.imshow('circle', img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    def drawTest(self):
+        # Testing that drawContour successfully places both contour groups
+        img = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
+        cv2.drawContours(img, self.frame_contours, -1, (255, 255, 0), 2)
+        cv2.drawContours(img, self.ocr_contours, -1, (255, 0, 255), 2)
+        for point in self.ocr_points:
+            cv2.circle(img, tuple(point), radius=3, color=(0, 255, 0), thickness=3)
+        cv2.imshow('circle', img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':
@@ -196,6 +196,7 @@ if __name__ == '__main__':
     comics = []
 
     for i in range(1,1249):
+        # TODO: Handle error from #363
         comicdictkey = f'comic_{i}'
         if comicdictkey not in comicsjson:
             comics.append(Comic(i))
@@ -205,6 +206,8 @@ if __name__ == '__main__':
                                         'save_loc' : str(comics[-1].save_loc)}
         else:
             print(f'{comicdictkey} already recorded')
+
+        # comics[-1].drawTest()
 
     with open('comics.json', 'w') as write_file:
         json.dump(comicsjson, write_file, sort_keys=True)
