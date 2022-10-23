@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- codingp  utf-8 -*-
 """
 Created on Tue Oct 20 11:21:20 2020
 @author: nelson-ryan
@@ -16,7 +16,8 @@ from pathlib import Path
 from google.cloud import vision
 
 # Google Vision credential
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "nomadic-zoo-293819-8ccfdaa58681.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
+    "nomadic-zoo-293819-8ccfdaa58681.json")
 save_dest_folder=Path('comics')
 
 class Comic:
@@ -84,6 +85,7 @@ class Comic:
             origin = cv2.boundingRect(contour)
             return (origin[1] // tolerance_factor) * cols + origin[0]
 
+        contours = list(contours)
         contours.sort(key=lambda x: get_contour_precedence(x, im.shape[0]))
 
         # Heavily gutted from https://stackoverflow.com/a/56473372
@@ -196,7 +198,6 @@ if __name__ == '__main__':
     comics = []
 
     for i in range(1,1249):
-        # TODO: Handle error from #363
         comicdictkey = f'comic_{i}'
         if comicdictkey not in comicsjson:
             comics.append(Comic(i))
