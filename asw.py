@@ -17,7 +17,7 @@ from google.cloud import vision
 
 # Google Vision credential
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
-    "nomadic-zoo-293819-8ccfdaa58681.json")
+    "nomadic-zoo-293819-43dc8cc8b69f.json")
 save_dest_folder=Path('comics')
 
 class Comic:
@@ -27,9 +27,9 @@ class Comic:
                                 str(number))
         res.raise_for_status()
         return object.__new__(cls)
-        
+
     def __init__(self, number):
-        
+
         self.number = number
         res = requests.get('https://www.asofterworld.com/index.php?id=' +
                                 str(self.number))
@@ -37,7 +37,7 @@ class Comic:
         comic = soup.select("#comicimg > img")
         self.url = comic[0].get('src')
         self.alt_text = comic[0].get('title')
-        self.filename = self.url.split('/')[-1]  
+        self.filename = self.url.split('/')[-1]
         self.save_loc = self.save_comic()
         self.frame_contours = self.find_frames()
         self.ocr_text = self.detect_text()
@@ -45,7 +45,7 @@ class Comic:
         self.frame_text = self.group_frame_text()
 
     def save_comic(self):
-        
+
         # no need to save it if it's already there
         save_loc = (Path(save_dest_folder) /
                     f'{self.number:04d}_{self.filename}')
@@ -65,7 +65,7 @@ class Comic:
 
         # Load locally-saved image
         im = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
-        
+
         # Check if image is missing final image data (as is the case with #363,
         # which causes errors with OCR, so this may be better to do there...)
         # Solution adapted from https://stackoverflow.com/a/68918602/12662447
@@ -76,7 +76,7 @@ class Comic:
                 cv2.imwrite(str(self.save_loc), im)
                 im = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
 
-        
+
         # Create greyscale version
         # IF it has a color layer (i.e. not already only grey)
         if len(im.shape) == 3: # shape is rows, columns, channels (if color)
@@ -140,7 +140,7 @@ class Comic:
                     response.error.message))
 
         return texts
-    
+
     def text2coords(self):
         # Create cv2 contour list from texts coordinates, reference:
         # https://stackoverflow.com/questions/14161331/
