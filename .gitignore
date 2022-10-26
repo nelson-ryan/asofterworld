@@ -1,0 +1,6 @@
+__pycache__/
+.venv/
+venv/
+comics.json
+comics/
+nomadic*
