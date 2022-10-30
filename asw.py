@@ -10,7 +10,6 @@ Created on Tue Oct 20 11:21:20 2020
 # TODO: Reorganize/move each step outside of constructor, allowing individual
 #       elements to be re-loaded as needed
 # TODO: Fix contours so that 'asofterworld.com' isn't included in final panel
-# TODO: Save list of comic objects into pickle (dill?)
 # TODO: Use Stanza (https://stanfordnlp.github.io/stanza/constituency.html) to
 #       parse into syntactic consituents
 # TODO: Compare Stanza constituents to comic frame boundaries.
@@ -24,6 +23,7 @@ import bs4
 import cv2
 import numpy as np
 import json
+import pickle
 from pathlib import Path
 from google.cloud import vision
 
@@ -227,12 +227,20 @@ if __name__ == '__main__':
 
 
     # If json data already exists, load it
-    if Path('comics.json').is_file():
-        with open('comics.json', 'r') as read_file:
+    jsonfile = 'comics.json'
+    if Path(jsonfile).is_file():
+        with open(jsonfile, 'r') as read_file:
             comicsjson = json.load(read_file)
     else:
         comicsjson = {}
-    comics = []
+
+    # If comics pickle already exists, load it
+    pkfile = 'comics.pk'
+    if Path(pkfile).is_file():
+        with open(pkfile, 'rb') as pk:
+            comics = pickle.load(pk)
+    else:
+        comics = []
 
     # Iterate through range of comic numbers
     for i in range(FIRST, LAST):
@@ -263,3 +271,6 @@ if __name__ == '__main__':
 
     with open('comics.json', 'w') as write_file:
         json.dump(comicsjson, write_file, sort_keys=True)
+
+    with open(pkfile, 'wb') as pk:
+        pickle.dump(comics, pk)
