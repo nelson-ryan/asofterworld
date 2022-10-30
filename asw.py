@@ -1,9 +1,21 @@
-# -*- codingp  utf-8 -*-
 """
 Created on Tue Oct 20 11:21:20 2020
 @author: nelson-ryan
-
 """
+# spaCy
+# https://stackoverflow.com/questions/56896753/is-there-a-way-to-get-entire-constituents-using-spacy
+# Stanza
+# https://stanfordnlp.github.io/stanza/constituency.html
+
+# TODO: Reorganize/move each step outside of constructor, allowing individual
+#       elements to be re-loaded as needed
+# TODO: Save image with overlaid contours, text boxes
+# TODO: Save list of comic objects into pickle (dill?)
+# TODO: Use Stanza (https://stanfordnlp.github.io/stanza/constituency.html) to
+#       parse into syntactic consituents
+# TODO: Compare Stanza constituents to comic frame boundaries.
+# TODO: Quantify
+# TODO: Visualize
 
 import requests
 import io
@@ -15,24 +27,24 @@ import json
 from pathlib import Path
 from google.cloud import vision
 
+FIRST = 1
+LAST = 1249
+BASE_URL = 'https://www.asofterworld.com/index.php?id='
+
 # Google Vision credential
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
     "nomadic-zoo-293819-43dc8cc8b69f.json")
 save_dest_folder=Path('comics')
 
 class Comic:
-    """A Softer World individual comic object."""
-    def __new__(cls, number):
-        res = requests.get('https://www.asofterworld.com/index.php?id=' +
-                                str(number))
-        res.raise_for_status()
-        return object.__new__(cls)
-
+    """ASofterWorld individual comic object."""
     def __init__(self, number):
 
         self.number = number
-        res = requests.get('https://www.asofterworld.com/index.php?id=' +
-                                str(self.number))
+        res = requests.get(BASE_URL + str(self.number))
+        # raise_for_status raises Exception if site can't be reached, but this
+        # is not an indicator of the presence of a comic, as the site redirects
+        res.raise_for_status()
         soup = bs4.BeautifulSoup(res.text, "html.parser")
         comic = soup.select("#comicimg > img")
         self.url = comic[0].get('src')
@@ -217,10 +229,24 @@ if __name__ == '__main__':
         comicsjson = {}
     comics = []
 
-    for i in range(1,1249):
+    # Iterate through range of comic numbers
+    for i in range(FIRST, LAST):
         comicdictkey = f'comic_{i}'
+
         if comicdictkey not in comicsjson:
             comics.append(Comic(i))
+        # if basic info not in json entry:
+            # add basic info
+            # comicsjson[comicdictkey][comic_number] = comics[-1].number
+            # comicsjson[comicdictkey][alt_text] = comics[-1].alt_text
+        # if original image not saved:
+            # download and save image
+        # if contours not recorded:
+            # find and record contours
+        # if OCR text not recorded:
+            # read OCR
+        # if panel-specific text not identified:
+            # identify and save panel-specific text
             comicsjson[comicdictkey] = {'alt_text' : comics[-1].alt_text,
                                         'comic_number' : comics[-1].number,
                                         'frame_text' : comics[-1].frame_text,
@@ -229,6 +255,7 @@ if __name__ == '__main__':
             print(f'{comicdictkey} already recorded')
 
         # comics[-1].drawTest()
+        # TODO save image
 
     with open('comics.json', 'w') as write_file:
         json.dump(comicsjson, write_file, sort_keys=True)
