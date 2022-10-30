@@ -9,7 +9,7 @@ Created on Tue Oct 20 11:21:20 2020
 
 # TODO: Reorganize/move each step outside of constructor, allowing individual
 #       elements to be re-loaded as needed
-# TODO: Save image with overlaid contours, text boxes
+# TODO: Fix contours so that 'asofterworld.com' isn't included in final panel
 # TODO: Save list of comic objects into pickle (dill?)
 # TODO: Use Stanza (https://stanfordnlp.github.io/stanza/constituency.html) to
 #       parse into syntactic consituents
@@ -28,13 +28,13 @@ from pathlib import Path
 from google.cloud import vision
 
 FIRST = 1
-LAST = 1249
+LAST = 1249 # (1248 comics, non-inclusive range)
 BASE_URL = 'https://www.asofterworld.com/index.php?id='
 
 # Google Vision credential
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
     "nomadic-zoo-293819-43dc8cc8b69f.json")
-save_dest_folder=Path('comics')
+save_dest_folder = Path('comics')
 
 class Comic:
     """ASofterWorld individual comic object."""
@@ -201,7 +201,7 @@ class Comic:
         text_by_frame[:] = [x for x in text_by_frame if x != '']
         return text_by_frame
 
-    def drawTest(self):
+    def saveContourImage(self):
         # Testing that drawContour successfully places both contour groups
         img = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
         cv2.drawContours(img, self.frame_contours, -1, (255, 255, 0), 2)
@@ -209,13 +209,18 @@ class Comic:
         for point in self.ocr_points:
             cv2.circle(img,
                        tuple(point),
-                       radius=3,
+                       radius=2,
                        color=(0, 255, 0),
                        thickness=3
             )
-        cv2.imshow('circle', img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        # cv2.imshow('circle', img)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
+        save_loc = (Path(save_dest_folder) /
+                    f'{self.number:04d}_{self.filename.split(".")[0]}_contours'
+                    '.jpg'
+                    )
+        cv2.imwrite(str(save_loc), img)
 
 
 if __name__ == '__main__':
@@ -251,11 +256,10 @@ if __name__ == '__main__':
                                         'comic_number' : comics[-1].number,
                                         'frame_text' : comics[-1].frame_text,
                                         'save_loc' : str(comics[-1].save_loc)}
+            comics[-1].saveContourImage()
         else:
             print(f'{comicdictkey} already recorded')
 
-        # comics[-1].drawTest()
-        # TODO save image
 
     with open('comics.json', 'w') as write_file:
         json.dump(comicsjson, write_file, sort_keys=True)
