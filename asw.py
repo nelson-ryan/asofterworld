@@ -23,7 +23,6 @@ import bs4
 import cv2
 import numpy as np
 import json
-import pickle
 from pathlib import Path
 from google.cloud import vision
 
@@ -234,13 +233,7 @@ if __name__ == '__main__':
     else:
         comicsjson = {}
 
-    # If comics pickle already exists, load it
-    pkfile = 'comics.pk'
-    if Path(pkfile).is_file():
-        with open(pkfile, 'rb') as pk:
-            comics = pickle.load(pk)
-    else:
-        comics = []
+    comics = []
 
     # Iterate through range of comic numbers
     for i in range(FIRST, LAST):
@@ -271,6 +264,3 @@ if __name__ == '__main__':
 
     with open('comics.json', 'w') as write_file:
         json.dump(comicsjson, write_file, sort_keys=True)
-
-    with open(pkfile, 'wb') as pk:
-        pickle.dump(comics, pk)
