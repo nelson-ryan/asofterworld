@@ -3,7 +3,7 @@ Created on Tue Oct 20 11:21:20 2020
 @author: nelson-ryan
 """
 # spaCy
-# https://stackoverflow.com/questions/56896753/is-there-a-way-to-get-entire-constituents-using-spacy
+# https://stackoverflow.com/questions/56896753/
 # Stanza
 # https://stanfordnlp.github.io/stanza/constituency.html
 
@@ -208,9 +208,9 @@ class Comic:
         for point in self.ocr_points:
             cv2.circle(img,
                        tuple(point),
-                       radius=2,
+                       radius=1,
                        color=(0, 255, 0),
-                       thickness=3
+                       thickness=2
             )
         # cv2.imshow('circle', img)
         # cv2.waitKey(0)
