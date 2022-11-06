@@ -7,7 +7,12 @@ Created on Tue Oct 20 11:21:20 2020
 # Stanza
 # https://stanfordnlp.github.io/stanza/constituency.html
 
-# TODO: Fix contours so that 'asofterworld.com' isn't included in final panel
+# TODO: Add cv2.threshold step to bring out text from the image.
+#       This may resolve some cases in which text and non-text patterns are
+#       caught by OCR. Using cv2.threshold with a higher threshold value should
+#       bring out the text, then feed that version of the image to OCR. (I
+#       expect there may be some cases--e.g. #70--where high-contrast letters
+#       in the image may be unavoidable)
 # TODO: Use Stanza (https://stanfordnlp.github.io/stanza/constituency.html) to
 #       parse into syntactic consituents
 # TODO: Compare Stanza constituents to comic frame boundaries.
@@ -95,7 +100,14 @@ class Comic:
         elif len(im.shape) == 2:  # shape has no 'channels' value if not color
             gr = im
         # Threshold to get black and white
-        _, grthresh = cv2.threshold(gr, 230, 255, cv2.THRESH_BINARY)
+        _, grthresh = cv2.threshold(gr, 40, 255, cv2.THRESH_BINARY)
+        # Check threshold result by saving image
+        cv2.imwrite(f'comics/{self.number:04d}_{self.filename}_thresh.jpg',
+                    grthresh)
+        # median filter to remove jpg noise; unneeded
+        grthresh = cv2.medianBlur(grthresh, 3)
+        cv2.imwrite(f'comics/{self.number:04d}_{self.filename}_blur.jpg',
+                    grthresh)
         # Find contours
         contours, _ = cv2.findContours(grthresh,
                                        cv2.RETR_LIST,
@@ -249,19 +261,22 @@ if __name__ == '__main__':
 
         if comicdictkey not in comicsjson:
             comic = Comic(i)
-            comics.append(comic)
             comic.download_jpg()
             comic.find_frames()
             comic.read_text()
             comic.assign_frametext()
         # store key info
             comicsjson[comicdictkey] = {}
-            comicsjson[comicdictkey]['alt_text'] = comics.alt_text
-            comicsjson[comicdictkey]['comic_number'] = comics.number
-            comicsjson[comicdictkey]['frame_text'] = comics.frame_text
-            comicsjson[comicdictkey]['save_loc'] = str(comics.save_loc)
+            comicsjson[comicdictkey]['alt_text'] = comic.alt_text
+            comicsjson[comicdictkey]['comic_number'] = comic.number
+            comicsjson[comicdictkey]['frame_text'] = comic.frame_text
+            comicsjson[comicdictkey]['save_loc'] = str(comic.save_loc)
         # show us what you got
-            comics[-1].saveContourImage()
+            comic.saveContourImage()
+            for line in comic.frame_text:
+                if ('comeau' in line) or ('asofterworld' in line):
+                    raise Exception(f'false positive in {comicdictkey}')
+            comics.append(comic)
         else:
             print(f'{comicdictkey} already recorded. Skipping all.')
 
