@@ -7,8 +7,6 @@ Created on Tue Oct 20 11:21:20 2020
 # Stanza
 # https://stanfordnlp.github.io/stanza/constituency.html
 
-# TODO: Reorganize/move each step outside of constructor, allowing individual
-#       elements to be re-loaded as needed
 # TODO: Fix contours so that 'asofterworld.com' isn't included in final panel
 # TODO: Use Stanza (https://stanfordnlp.github.io/stanza/constituency.html) to
 #       parse into syntactic consituents
@@ -49,19 +47,21 @@ class Comic:
         self.url = comic[0].get('src')
         self.alt_text = comic[0].get('title')
         self.filename = self.url.split('/')[-1]
-        self.save_loc = self.save_comic()
-        self.frame_contours = self.find_frames()
-        self.ocr_text = self.detect_text()
-        self.ocr_contours, self.ocr_points = self.text2coords()
-        self.frame_text = self.group_frame_text()
+        self.save_loc = None
+        self.frame_contours = None
+        self.ocr_text = None
+        self.ocr_contours = None
+        self.ocr_points = None
+        self.frame_text = None
 
-    def save_comic(self):
+    def download_jpg(self):
 
         # no need to save it if it's already there
         save_loc = (Path(save_dest_folder) /
                     f'{self.number:04d}_{self.filename}')
+        self.save_loc = save_loc
         if save_loc.exists():
-            print(f'{save_loc} already exists')
+            print(f'{save_loc} already exists. Skipping download.')
         else:
             if not save_dest_folder.exists():
                 save_dest_folder.mkdir()
@@ -129,9 +129,10 @@ class Comic:
         # Convert entire list to contour ndarray
         contour_shortlist = np.array(contour_shortlist, dtype=np.int32)
 
+        self.frame_contours = contour_shortlist
         return contour_shortlist
 
-    def detect_text(self):
+    def read_text(self):
         """Detects text in the file."""
 
         with io.open(self.save_loc, 'rb') as image_file:
@@ -150,6 +151,7 @@ class Comic:
                 'https://cloud.google.com/apis/design/errors'.format(
                     response.error.message))
 
+        self.ocr_text = texts
         return texts
 
     def text2coords(self):
@@ -181,15 +183,20 @@ class Comic:
         # Also convert final to contour ndarray
         word_contours = np.array(word_contours, dtype=np.int32)
 
+        self.ocr_contours = word_contours
+        self.ocr_points = word_points
         return word_contours, word_points
 
     # Check for word location within frame contours, add corresponding text
-    def group_frame_text(self):
+    # TODO: add assign_frametext to read_text() if there are frame contours
+    def assign_frametext(self):
+        self.text2coords()
         text_by_frame = []
         for j in range(len(self.frame_contours)):
             text_by_frame.append([])
             for k in range(1, len(self.ocr_points)):
-                # Check if text is inside frame; pointPolygonTest 1 if yes
+                # Check if text is inside frame;
+                # pointPolygonTest returns 1 if yes
                 if cv2.pointPolygonTest(contour=self.frame_contours[j],
                                         pt=tuple(self.ocr_points[k]),
                                         measureDist=False) > 0:
@@ -198,6 +205,7 @@ class Comic:
             text_by_frame[j] = ' '.join(text_by_frame[j])
         # get rid of empty strings for frames without text
         text_by_frame[:] = [x for x in text_by_frame if x != '']
+        self.frame_text = text_by_frame
         return text_by_frame
 
     def saveContourImage(self):
@@ -240,26 +248,22 @@ if __name__ == '__main__':
         comicdictkey = f'comic_{i}'
 
         if comicdictkey not in comicsjson:
-            comics.append(Comic(i))
-        # if basic info not in json entry:
-            # add basic info
-            # comicsjson[comicdictkey][comic_number] = comics[-1].number
-            # comicsjson[comicdictkey][alt_text] = comics[-1].alt_text
-        # if original image not saved:
-            # download and save image
-        # if contours not recorded:
-            # find and record contours
-        # if OCR text not recorded:
-            # read OCR
-        # if panel-specific text not identified:
-            # identify and save panel-specific text
-            comicsjson[comicdictkey] = {'alt_text' : comics[-1].alt_text,
-                                        'comic_number' : comics[-1].number,
-                                        'frame_text' : comics[-1].frame_text,
-                                        'save_loc' : str(comics[-1].save_loc)}
+            comic = Comic(i)
+            comics.append(comic)
+            comic.download_jpg()
+            comic.find_frames()
+            comic.read_text()
+            comic.assign_frametext()
+        # store key info
+            comicsjson[comicdictkey] = {}
+            comicsjson[comicdictkey]['alt_text'] = comics.alt_text
+            comicsjson[comicdictkey]['comic_number'] = comics.number
+            comicsjson[comicdictkey]['frame_text'] = comics.frame_text
+            comicsjson[comicdictkey]['save_loc'] = str(comics.save_loc)
+        # show us what you got
             comics[-1].saveContourImage()
         else:
-            print(f'{comicdictkey} already recorded')
+            print(f'{comicdictkey} already recorded. Skipping all.')
 
 
     with open('comics.json', 'w') as write_file:
