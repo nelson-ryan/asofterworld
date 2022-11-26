@@ -7,12 +7,8 @@ Created on Tue Oct 20 11:21:20 2020
 # Stanza
 # https://stanfordnlp.github.io/stanza/constituency.html
 
-# TODO: Add cv2.threshold step to bring out text from the image.
-#       This may resolve some cases in which text and non-text patterns are
-#       caught by OCR. Using cv2.threshold with a higher threshold value should
-#       bring out the text, then feed that version of the image to OCR. (I
-#       expect there may be some cases--e.g. #70--where high-contrast letters
-#       in the image may be unavoidable)
+# TODO: Instead of filtering OCR results for those positioned within text
+#       frames, filter OCR results for those positions within text boxes
 # TODO: Use Stanza (https://stanfordnlp.github.io/stanza/constituency.html) to
 #       parse into syntactic consituents
 # TODO: Compare Stanza constituents to comic frame boundaries.
@@ -54,6 +50,7 @@ class Comic:
         self.filename = self.url.split('/')[-1]
         self.save_loc = None
         self.frame_contours = None
+        self.text_boxes = None
         self.ocr_text = None
         self.ocr_contours = None
         self.ocr_points = None
@@ -73,15 +70,15 @@ class Comic:
             with open(save_loc, 'wb') as img:
                 img_url = requests.get(self.url)
                 img.write(img_url.content)
+        self.__fix_broken_jpg()
         return save_loc
 
     def __fix_broken_jpg(self):
-        # Check if image is missing final image data (as is the case with #363,
-        # which causes errors with OCR, so this may be better to do there...)
+        # Check if image is missing final image data (as is the case with #363)
         # Solution adapted from https://stackoverflow.com/a/68918602/12662447
         with open(self.save_loc, 'rb') as imgopen:
             imgopen.seek(-2,2)
-            # If so, overwrite and re-read image file
+            # If end of file is different than expected, overwrite
             if imgopen.read() != b'\xff\xd9':
                 cv2.imwrite(str(self.save_loc), im)
 
@@ -89,29 +86,28 @@ class Comic:
 
     def find_frames(self):
 
-        self.__fix_broken_jpg()
-
         # Load locally-saved image
         im = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
 
         # Create greyscale version
         # IF it has a color layer (i.e. not already only grey)
-        # shape is rows, columns, channels (if color) or rows, columns (grey)
-        gr = (cv2.cvtColor(im, cv2.COLOR_BGR2GRAY) if len(im.shape) == 3
-                else im if len(im.shape) == 2
-                else raise Exception)
+        # im.shape is rows, columns, channels (if color) or rows, columns (grey)
+        grey = (
+            im if len(im.shape) == 2
+            else cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+        )
 
-        # Threshold to get black and white
-        _, grthresh = cv2.threshold(gr, 40, 255, cv2.THRESH_BINARY)
+        # Threshold to get binary black-and-white
+        _, framethresh = cv2.threshold(grey, 40, 255, cv2.THRESH_BINARY)
         # Check threshold result by saving image
-        cv2.imwrite(f'comics/{self.number:04d}_{self.filename}_thresh.jpg',
-                    grthresh)
-        # median filter to remove jpg noise; unneeded
-        grthresh = cv2.medianBlur(grthresh, 3)
-        cv2.imwrite(f'comics/{self.number:04d}_{self.filename}_blur.jpg',
-                    grthresh)
+        # cv2.imwrite(f'comics/{self.number:04d}_{self.filename}_thresh.jpg',
+        #             framethresh)
+        # Median filter to remove jpg noise
+        framethresh = cv2.medianBlur(framethresh, 3)
+        # cv2.imwrite(f'comics/{self.number:04d}_{self.filename}_blur.jpg',
+        #             framethresh)
         # Find contours
-        contours, _ = cv2.findContours(grthresh,
+        contours, _ = cv2.findContours(framethresh,
                                        cv2.RETR_LIST,
                                        cv2.CHAIN_APPROX_SIMPLE)
 
@@ -144,6 +140,34 @@ class Comic:
         contour_shortlist = np.array(contour_shortlist, dtype=np.int32)
 
         self.frame_contours = contour_shortlist
+        return contour_shortlist
+
+    def find_textboxes(self):
+        self.download_jpg()
+        im = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
+        grey = (
+            im if len(im.shape) == 2
+            else cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+        )
+        _, textboxthresh = cv2.threshold(grey, 230, 255, cv2.THRESH_BINARY)
+        contours, _ = cv2.findContours(framethresh,
+                                       cv2.RETR_LIST,
+                                       cv2.CHAIN_APPROX_SIMPLE)
+
+        # Identify frames by including only contours with sufficient area
+        contour_shortlist = []
+        contour_shortlist = [
+                cv2.boxPoints(cv2.minAreaRect(c)) for c in contours
+                if 300 < cv2.contourArea(c) < 50000
+        ]
+        # Convert entire list to contour ndarray
+        contour_shortlist = np.array(contour_shortlist, dtype=np.int32)
+
+        cv2.drawContours(textboxthresh, contour_shortlist, -1, (255, 255, 0), 2)
+
+        cv2.imwrite(f'comics/{self.number:04d}_textthresh.jpg',
+                    textboxthresh)
+        self.text_boxes = contour_shortlist
         return contour_shortlist
 
     def read_text(self):
