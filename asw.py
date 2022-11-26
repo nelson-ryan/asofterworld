@@ -75,13 +75,7 @@ class Comic:
                 img.write(img_url.content)
         return save_loc
 
-    ### OCR ###
-
-    def find_frames(self):
-
-        # Load locally-saved image
-        im = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
-
+    def __fix_broken_jpg(self):
         # Check if image is missing final image data (as is the case with #363,
         # which causes errors with OCR, so this may be better to do there...)
         # Solution adapted from https://stackoverflow.com/a/68918602/12662447
@@ -90,15 +84,23 @@ class Comic:
             # If so, overwrite and re-read image file
             if imgopen.read() != b'\xff\xd9':
                 cv2.imwrite(str(self.save_loc), im)
-                im = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
 
+    ### OCR ###
+
+    def find_frames(self):
+
+        self.__fix_broken_jpg()
+
+        # Load locally-saved image
+        im = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
 
         # Create greyscale version
         # IF it has a color layer (i.e. not already only grey)
-        if len(im.shape) == 3: # shape is rows, columns, channels (if color)
-            gr = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-        elif len(im.shape) == 2:  # shape has no 'channels' value if not color
-            gr = im
+        # shape is rows, columns, channels (if color) or rows, columns (grey)
+        gr = (cv2.cvtColor(im, cv2.COLOR_BGR2GRAY) if len(im.shape) == 3
+                else im if len(im.shape) == 2
+                else raise Exception)
+
         # Threshold to get black and white
         _, grthresh = cv2.threshold(gr, 40, 255, cv2.THRESH_BINARY)
         # Check threshold result by saving image
