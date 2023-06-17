@@ -58,7 +58,9 @@ class Comic:
 
     def download_jpg(self):
 
-        # no need to save it if it's already there
+    def download_jpg(self):
+        """Exactly what it says on the tin,
+        if the image isn't already saved locally"""
         save_loc = (Path(save_dest_folder) /
                     f'{self.number:04d}_{self.filename}')
         self.save_loc = save_loc
@@ -74,17 +76,20 @@ class Comic:
         return save_loc
 
     def __fix_broken_jpg(self):
-        # Check if image is missing final image data (as is the case with #363)
-        # Solution adapted from https://stackoverflow.com/a/68918602/12662447
+        """Check if image is missing file-final image data
+        (as is the case with #363)
+        Solution adapted from https://stackoverflow.com/a/68918602/12662447"""
         with open(self.save_loc, 'rb') as imgopen:
             imgopen.seek(-2,2)
             # If end of file is different than expected, overwrite
             if imgopen.read() != b'\xff\xd9':
+                im = cv2.imread(str(self.save_loc))
                 cv2.imwrite(str(self.save_loc), im)
 
     ### OCR ###
 
     def find_frames(self):
+        """Identify the boundaries of individual panels"""
 
         # Load locally-saved image
         im = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
@@ -143,6 +148,7 @@ class Comic:
         return contour_shortlist
 
     def find_textboxes(self):
+        """"""
         self.download_jpg()
         im = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
         grey = (
@@ -193,8 +199,8 @@ class Comic:
         return texts
 
     def text2coords(self):
-        # Create cv2 contour list from texts coordinates, reference:
-        # https://stackoverflow.com/questions/14161331/
+        """Create cv2 contour list from texts coordinates,
+        Reference: https://stackoverflow.com/questions/14161331/"""
         word_contours = []  # for storing all words
         word_points = []
 
@@ -247,7 +253,7 @@ class Comic:
         return text_by_frame
 
     def saveContourImage(self):
-        # Testing that drawContour successfully places both contour groups
+        """Testing that drawContour successfully places both contour groups"""
         img = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
         cv2.drawContours(img, self.frame_contours, -1, (255, 255, 0), 2)
         cv2.drawContours(img, self.ocr_contours, -1, (255, 0, 255), 2)
@@ -258,6 +264,7 @@ class Comic:
                        color=(0, 255, 0),
                        thickness=2
             )
+        # Display for testing purposes
         # cv2.imshow('circle', img)
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
