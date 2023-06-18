@@ -11,6 +11,14 @@ Created on Tue Oct 20 11:21:20 2020
 #       frames, filter OCR results for those positions within text boxes
 # TODO: Use Stanza (https://stanfordnlp.github.io/stanza/constituency.html) to
 #       parse into syntactic consituents
+#   1 get flat string from comic
+#   2 feed flat string into Stanza --> should provide boundaries
+"""
+nlp = stanza.Pipeline(lang='en', processors='tokenize,pos,constituency')
+doc = nlp('This is a test')
+for sentence in doc.sentences:
+    print(sentence.constituency)
+"""
 # TODO: Compare Stanza constituents to comic frame boundaries.
 # TODO: Quantify
 # TODO: Visualize
@@ -24,6 +32,7 @@ import numpy as np
 import json
 from pathlib import Path
 from google.cloud import vision
+import stanza
 
 FIRST = 1
 LAST = 1249 # (1248 comics, non-inclusive range)
@@ -36,6 +45,7 @@ save_dest_folder = Path('comics')
 
 class Comic:
     """ASofterWorld individual comic object."""
+    nlp = stanza.Pipeline(lang='en', processors='tokenize,pos,constituency')
 
     def __init__(self, number):
         """"""
@@ -50,6 +60,9 @@ class Comic:
         self.ocr_contours = None
         self.ocr_points = None
         self.frame_text = None
+        self.sentences = None # added by self.parse(), this shows a parsed
+                              # constituency, though in a form that likely
+                              # isn't immediately useful, but promising
 
     def fetch(self):
         """"""
@@ -284,6 +297,12 @@ class Comic:
                     )
         cv2.imwrite(str(save_loc), img)
 
+    def parse(self):
+        # TODO make a static variable?
+        doc = Comic.nlp(' '.join(self.frame_text))
+        self.sentences = [x.constituency for x in doc.sentences]
+        # for sentence in doc.sentences:
+            # print(sentence.constituency)
 
 if __name__ == '__main__':
 
