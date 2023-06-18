@@ -36,18 +36,13 @@ save_dest_folder = Path('comics')
 
 class Comic:
     """ASofterWorld individual comic object."""
-    def __init__(self, number):
 
+    def __init__(self, number):
+        """"""
         self.number = number
-        res = requests.get(BASE_URL + str(self.number))
-        # raise_for_status raises Exception if site can't be reached, but this
-        # is not an indicator of the presence of a comic, as the site redirects
-        res.raise_for_status()
-        soup = bs4.BeautifulSoup(res.text, "html.parser")
-        comic = soup.select("#comicimg > img")
-        self.url = comic[0].get('src')
-        self.alt_text = comic[0].get('title')
-        self.filename = self.url.split('/')[-1]
+        self.url = None
+        self.alt_text = None
+        self.filename = None
         self.save_loc = None
         self.frame_contours = None
         self.text_boxes = None
@@ -56,7 +51,22 @@ class Comic:
         self.ocr_points = None
         self.frame_text = None
 
-    def download_jpg(self):
+    def fetch(self):
+        """"""
+        res = requests.get(BASE_URL + str(self.number))
+        # raise_for_status raises Exception if site can't be reached, but this
+        # is not an indicator of the absence of a comic, bc the site redirects
+        res.raise_for_status()
+        comic = (
+            bs4.BeautifulSoup(res.text, "html.parser")
+            .select("#comicimg > img")
+        )
+        try:
+            self.url = comic[0].get('src')
+        except IndexError:
+            raise Exception(f'Comic {self.number} does not exist')
+        self.alt_text = comic[0].get('title')
+        self.filename = self.url.split('/')[-1]
 
     def download_jpg(self):
         """Exactly what it says on the tin,
@@ -294,6 +304,7 @@ if __name__ == '__main__':
 
         if comicdictkey not in comicsjson:
             comic = Comic(i)
+            comic.fetch()
             comic.download_jpg()
             comic.find_frames()
             comic.read_text()
