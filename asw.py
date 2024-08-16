@@ -40,7 +40,8 @@ BASE_URL = 'https://www.asofterworld.com/index.php?id='
 
 # Google Vision credential
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
-    "nomadic-zoo-293819-43dc8cc8b69f.json")
+    "nomadic-zoo-293819-43dc8cc8b69f.json"
+)
 save_dest_folder = Path('comics')
 
 class Comic:
@@ -65,11 +66,12 @@ class Comic:
                               # isn't immediately useful, but promising
 
     def fetch(self):
-        """"""
+        """Get html information via BeautifulSoup"""
         res = requests.get(BASE_URL + str(self.number))
         # raise_for_status raises Exception if site can't be reached, but this
         # is not an indicator of the absence of a comic, bc the site redirects
-        res.raise_for_status()
+
+        res.raise_for_status() # TODO Add error handling for 500 server error
         comic = (
             bs4.BeautifulSoup(res.text, "html.parser")
             .select("#comicimg > img")
@@ -82,8 +84,10 @@ class Comic:
         self.filename = self.url.split('/')[-1]
 
     def download_jpg(self):
-        """Exactly what it says on the tin,
-        if the image isn't already saved locally"""
+        """Downloads the comic jpg to local folder,
+        if the image isn't already saved.
+        Includes correction of file-final image data,
+        which a few of the online comic images are missing."""
         save_loc = (Path(save_dest_folder) /
                     f'{self.number:04d}_{self.filename}')
         self.save_loc = save_loc
@@ -127,18 +131,20 @@ class Comic:
 
         # Threshold to get binary black-and-white
         _, framethresh = cv2.threshold(grey, 40, 255, cv2.THRESH_BINARY)
-        # Check threshold result by saving image
+        # For testing: Save image with threshold result
         # cv2.imwrite(f'comics/{self.number:04d}_{self.filename}_thresh.jpg',
         #             framethresh)
         # Median filter to remove jpg noise
         framethresh = cv2.medianBlur(framethresh, 3)
+        # For testing: Save image with blur result
         # cv2.imwrite(f'comics/{self.number:04d}_{self.filename}_blur.jpg',
         #             framethresh)
-        # Find contours
+        # Find contours, which should now correspond to panel frames
         contours, _ = cv2.findContours(framethresh,
                                        cv2.RETR_LIST,
                                        cv2.CHAIN_APPROX_SIMPLE)
 
+        # Properly order the panels in reading sequence
         # This function comes from https://stackoverflow.com/a/39445901
         def get_contour_precedence(contour, cols):
             tolerance_factor = 50
@@ -147,6 +153,8 @@ class Comic:
 
         contours = list(contours)
         contours.sort(key=lambda x: get_contour_precedence(x, im.shape[0]))
+
+        # Filter contours by area to identify main panels
 
         # Heavily gutted from https://stackoverflow.com/a/56473372
         # Create empty list for contours of frames
@@ -171,7 +179,8 @@ class Comic:
         return contour_shortlist
 
     def find_textboxes(self):
-        """"""
+        """Not sure what this contributes or where this was to be used;
+        seems to work without it"""
         self.download_jpg()
         im = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
         grey = (
@@ -221,7 +230,7 @@ class Comic:
         self.ocr_text = texts
         return texts
 
-    def text2coords(self):
+    def __text2coords(self):
         """Create cv2 contour list from texts coordinates,
         Reference: https://stackoverflow.com/questions/14161331/"""
         word_contours = []  # for storing all words
@@ -257,7 +266,7 @@ class Comic:
     # Check for word location within frame contours, add corresponding text
     # TODO: add assign_frametext to read_text() if there are frame contours
     def assign_frametext(self):
-        self.text2coords()
+        self.__text2coords()
         text_by_frame = []
         for j in range(len(self.frame_contours)):
             text_by_frame.append([])
@@ -323,17 +332,23 @@ if __name__ == '__main__':
 
         if comicdictkey not in comicsjson:
             comic = Comic(i)
+            # get html information by means fo BeautifulSoup
             comic.fetch()
+            # download (and fix, if necessary, broken files)
             comic.download_jpg()
+            # identify panel boundaries
             comic.find_frames()
+            # run ocr to get text
             comic.read_text()
             comic.assign_frametext()
+
         # store key info
             comicsjson[comicdictkey] = {}
             comicsjson[comicdictkey]['alt_text'] = comic.alt_text
             comicsjson[comicdictkey]['comic_number'] = comic.number
             comicsjson[comicdictkey]['frame_text'] = comic.frame_text
             comicsjson[comicdictkey]['save_loc'] = str(comic.save_loc)
+
         # show us what you got
             comic.saveContourImage()
             for line in comic.frame_text:
