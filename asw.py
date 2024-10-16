@@ -37,11 +37,14 @@ import stanza
 FIRST = 1
 LAST = 1249 # (1248 comics, non-inclusive range)
 BASE_URL = 'https://www.asofterworld.com/index.php?id='
+JSONFILE = 'comics.json'
+IMG_FOLDER = 'comics'
+save_dest_folder = Path(IMG_FOLDER)
 
 # Google Vision credential
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
-    "nomadic-zoo-293819-43dc8cc8b69f.json")
-save_dest_folder = Path('comics')
+    "nomadic-zoo-293819-43dc8cc8b69f.json"
+)
 
 class Comic:
     """ASofterWorld individual comic object."""
@@ -49,7 +52,7 @@ class Comic:
 
     def __init__(self, number):
         """"""
-        self.number = number
+        self.id = number
         self.url = None
         self.alt_text = None
         self.filename = None
@@ -66,7 +69,7 @@ class Comic:
 
     def fetch(self):
         """"""
-        res = requests.get(BASE_URL + str(self.number))
+        res = requests.get(BASE_URL + str(self.id))
         # raise_for_status raises Exception if site can't be reached, but this
         # is not an indicator of the absence of a comic, bc the site redirects
         res.raise_for_status()
@@ -77,7 +80,7 @@ class Comic:
         try:
             self.url = comic[0].get('src')
         except IndexError:
-            raise Exception(f'Comic {self.number} does not exist')
+            raise Exception(f'Comic {self.id} does not exist')
         self.alt_text = comic[0].get('title')
         self.filename = self.url.split('/')[-1]
 
@@ -85,7 +88,7 @@ class Comic:
         """Exactly what it says on the tin,
         if the image isn't already saved locally"""
         save_loc = (Path(save_dest_folder) /
-                    f'{self.number:04d}_{self.filename}')
+                    f'{self.id:04d}_{self.filename}')
         self.save_loc = save_loc
         if save_loc.exists():
             print(f'{save_loc} already exists. Skipping download.')
@@ -128,11 +131,11 @@ class Comic:
         # Threshold to get binary black-and-white
         _, framethresh = cv2.threshold(grey, 40, 255, cv2.THRESH_BINARY)
         # Check threshold result by saving image
-        # cv2.imwrite(f'comics/{self.number:04d}_{self.filename}_thresh.jpg',
+        # cv2.imwrite(f'comics/{self.id:04d}_{self.filename}_thresh.jpg',
         #             framethresh)
         # Median filter to remove jpg noise
         framethresh = cv2.medianBlur(framethresh, 3)
-        # cv2.imwrite(f'comics/{self.number:04d}_{self.filename}_blur.jpg',
+        # cv2.imwrite(f'comics/{self.id:04d}_{self.filename}_blur.jpg',
         #             framethresh)
         # Find contours
         contours, _ = cv2.findContours(framethresh,
@@ -194,7 +197,7 @@ class Comic:
 
         cv2.drawContours(textboxthresh, contour_shortlist, -1, (255, 255, 0), 2)
 
-        cv2.imwrite(f'comics/{self.number:04d}_textthresh.jpg',
+        cv2.imwrite(f'comics/{self.id:04d}_textthresh.jpg',
                     textboxthresh)
         self.text_boxes = contour_shortlist
         return contour_shortlist
@@ -292,7 +295,7 @@ class Comic:
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
         save_loc = (Path(save_dest_folder) /
-                    f'{self.number:04d}_{self.filename.split(".")[0]}_contours'
+                    f'{self.id:04d}_{self.filename.split(".")[0]}_contours'
                     '.jpg'
                     )
         cv2.imwrite(str(save_loc), img)
@@ -308,16 +311,15 @@ if __name__ == '__main__':
 
 
     # If json data already exists, load it
-    jsonfile = 'comics.json'
-    if Path(jsonfile).is_file():
-        with open(jsonfile, 'r') as read_file:
+    if Path(JSONFILE).is_file():
+        with open(JSONFILE, 'r') as read_file:
             comicsjson = json.load(read_file)
     else:
         comicsjson = {}
 
     comics = []
 
-    # Iterate through range of comic numbers
+    # Iterate through range of comic ids
     for i in range(FIRST, LAST):
         comicdictkey = f'comic_{i}'
 
@@ -331,7 +333,7 @@ if __name__ == '__main__':
         # store key info
             comicsjson[comicdictkey] = {}
             comicsjson[comicdictkey]['alt_text'] = comic.alt_text
-            comicsjson[comicdictkey]['comic_number'] = comic.number
+            comicsjson[comicdictkey]['comic_number'] = comic.id
             comicsjson[comicdictkey]['frame_text'] = comic.frame_text
             comicsjson[comicdictkey]['save_loc'] = str(comic.save_loc)
         # show us what you got
