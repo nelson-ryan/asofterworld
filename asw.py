@@ -36,10 +36,7 @@ import stanza
 
 FIRST = 1
 LAST = 1249 # (1248 comics, non-inclusive range)
-BASE_URL = 'https://www.asofterworld.com/index.php?id='
 JSONFILE = 'comics.json'
-IMG_FOLDER = 'comics'
-save_dest_folder = Path(IMG_FOLDER)
 
 # Google Vision credential
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
@@ -47,16 +44,31 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
 )
 
 class Comic:
-    """ASofterWorld individual comic object."""
+    """
+    ASofterWorld individual comic object.
+    """
     nlp = stanza.Pipeline(lang='en', processors='tokenize,pos,constituency')
+    BASE_URL = 'https://www.asofterworld.com/index.php?id='
 
-    def __init__(self, number):
-        """"""
-        self.id = number
-        self.url = None
-        self.alt_text = None
-        self.filename = None
-        self.save_loc = None
+    IMG_FOLDER = 'comics'
+    SAVE_DEST_FOLDER = Path(IMG_FOLDER)
+
+    def __init__(self, number: int):
+        """
+        """
+        self.id: int = number
+        self.url: str = self.BASE_URL + str(self.id)
+        self.soup: bs4.element.Tag = self.get_soup()
+        try:
+            self.img_url: str = str(self.soup.get('src'))
+        except IndexError:
+            raise Exception(f'Comic {self.id} does not exist')
+        self.alt_text: str = str(self.soup.get('title'))
+        self.filename: str = self.img_url.split('/')[-1]
+        self.local_img_path: Path = (
+            Path(self.SAVE_DEST_FOLDER) / f'{self.id:04d}_{self.filename}'
+        )
+
         self.frame_contours = None
         self.text_boxes = None
         self.ocr_text = None
@@ -67,58 +79,57 @@ class Comic:
                               # constituency, though in a form that likely
                               # isn't immediately useful, but promising
 
-    def fetch(self):
-        """"""
-        res = requests.get(BASE_URL + str(self.id))
-        # raise_for_status raises Exception if site can't be reached, but this
-        # is not an indicator of the absence of a comic, bc the site redirects
+    def get_soup(self) -> bs4.element.Tag:
+        """
+        Retrieve remote html from which to pull info.
+        """
+        res = requests.get(self.url)
         res.raise_for_status()
-        comic = (
+        soup_element_tag = (
             bs4.BeautifulSoup(res.text, "html.parser")
             .select("#comicimg > img")
-        )
-        try:
-            self.url = comic[0].get('src')
-        except IndexError:
-            raise Exception(f'Comic {self.id} does not exist')
-        self.alt_text = comic[0].get('title')
-        self.filename = self.url.split('/')[-1]
+        )[0]
+        return soup_element_tag
 
     def download_jpg(self):
-        """Exactly what it says on the tin,
-        if the image isn't already saved locally"""
-        save_loc = (Path(save_dest_folder) /
-                    f'{self.id:04d}_{self.filename}')
-        self.save_loc = save_loc
-        if save_loc.exists():
-            print(f'{save_loc} already exists. Skipping download.')
+        """
+        Exactly what it says on the tin,
+        if the image isn't already saved locally
+        """
+        if self.local_img_path.exists():
+            print(f'{self.local_img_path} already exists. Skipping download.')
         else:
-            if not save_dest_folder.exists():
-                save_dest_folder.mkdir()
-            with open(save_loc, 'wb') as img:
-                img_url = requests.get(self.url)
+            if not self.SAVE_DEST_FOLDER.exists():
+                self.SAVE_DEST_FOLDER.mkdir()
+            with open(self.local_img_path, 'wb') as img:
+                img_url = requests.get(self.img_url)
                 img.write(img_url.content)
-        self.__fix_broken_jpg()
-        return save_loc
 
-    def __fix_broken_jpg(self):
+        Comic.__fix_broken_jpg(self.local_img_path)
+
+        return self.local_img_path
+
+    @staticmethod
+    def __fix_broken_jpg(img_path):
         """Check if image is missing file-final image data
         (as is the case with #363)
         Solution adapted from https://stackoverflow.com/a/68918602/12662447"""
-        with open(self.save_loc, 'rb') as imgopen:
+        with open(img_path, 'rb') as imgopen:
             imgopen.seek(-2,2)
             # If end of file is different than expected, overwrite
             if imgopen.read() != b'\xff\xd9':
-                im = cv2.imread(str(self.save_loc))
-                cv2.imwrite(str(self.save_loc), im)
+                im = cv2.imread(str(img_path))
+                cv2.imwrite(str(img_path), im)
 
     ### OCR ###
 
     def find_frames(self):
-        """Identify the boundaries of individual panels"""
+        """
+        Identify the boundaries of individual panels
+        """
 
         # Load locally-saved image
-        im = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
+        im = cv2.imread(str(self.local_img_path), cv2.IMREAD_UNCHANGED)
 
         # Create greyscale version
         # IF it has a color layer (i.e. not already only grey)
@@ -176,7 +187,7 @@ class Comic:
     def find_textboxes(self):
         """"""
         self.download_jpg()
-        im = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
+        im = cv2.imread(str(self.local_img_path), cv2.IMREAD_UNCHANGED)
         grey = (
             im if len(im.shape) == 2
             else cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
@@ -205,7 +216,7 @@ class Comic:
     def read_text(self):
         """Detects text in the file."""
 
-        with io.open(self.save_loc, 'rb') as image_file:
+        with io.open(self.local_img_path, 'rb') as image_file:
             content = image_file.read()
         image = vision.Image(content=content)
 
@@ -280,7 +291,7 @@ class Comic:
 
     def saveContourImage(self):
         """Testing that drawContour successfully places both contour groups"""
-        img = cv2.imread(str(self.save_loc), cv2.IMREAD_UNCHANGED)
+        img = cv2.imread(str(self.local_img_path), cv2.IMREAD_UNCHANGED)
         cv2.drawContours(img, self.frame_contours, -1, (255, 255, 0), 2)
         cv2.drawContours(img, self.ocr_contours, -1, (255, 0, 255), 2)
         for point in self.ocr_points:
@@ -325,7 +336,6 @@ if __name__ == '__main__':
 
         if comicdictkey not in comicsjson:
             comic = Comic(i)
-            comic.fetch()
             comic.download_jpg()
             comic.find_frames()
             comic.read_text()
