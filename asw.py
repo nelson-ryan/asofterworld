@@ -33,6 +33,7 @@ import json
 from pathlib import Path
 from google.cloud import vision
 import stanza
+from typing import Sequence
 
 FIRST = 1
 LAST = 1249 # (1248 comics, non-inclusive range)
@@ -40,7 +41,7 @@ JSONFILE = 'comics.json'
 
 # Google Vision credential
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
-    "nomadic-zoo-293819-43dc8cc8b69f.json"
+    "nomadic-zoo-293819-eecd00e68b8e.json"
 )
 
 class Comic:
@@ -52,6 +53,7 @@ class Comic:
 
     IMG_FOLDER = 'comics'
     SAVE_DEST_FOLDER = Path(IMG_FOLDER)
+    CLIENT = vision.ImageAnnotatorClient()
 
     def __init__(self, number: int):
         """
@@ -69,15 +71,44 @@ class Comic:
             Path(self.SAVE_DEST_FOLDER) / f'{self.id:04d}_{self.filename}'
         )
 
-        self.frame_contours = None
-        self.text_boxes = None
-        self.ocr_text = None
-        self.ocr_contours = None
-        self.ocr_points = None
-        self.frame_text = None
+        # 
+        self.img: np.ndarray = np.array(None)
+
+        self.panel_frame_contours = []
+        self.text_boxes = []
+        self.ocr_text: Sequence = []
+        self.ocr_contours: Sequence = []
+        self.ocr_points: Sequence = []
+        self.frame_text: list = []
         self.sentences = None # added by self.parse(), this shows a parsed
                               # constituency, though in a form that likely
                               # isn't immediately useful, but promising
+
+
+    def process_comic(self):
+        """
+        Full sequence for each comic.
+        """
+        self.download_jpg()
+        self.img = cv2.imread(str(self.local_img_path))
+        self._fix_broken_jpg()
+        self.ocr_text = self.read_text()
+        self.panel_frame_contours = self.find_panel_frames()
+        self.text_boxes = self.find_textboxes()
+        self.frame_text = self.assign_paneltext()
+        return
+
+
+    def show_img(self, img = None) -> None:
+        """
+        Display whichever image in a temporary window.
+        """
+        img = self.img if not img else img
+        cv2.imshow(self.alt_text, img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+        return None
+
 
     def get_soup(self) -> bs4.element.Tag:
         """
@@ -90,6 +121,7 @@ class Comic:
             .select("#comicimg > img")
         )[0]
         return soup_element_tag
+
 
     def download_jpg(self):
         """
@@ -104,73 +136,100 @@ class Comic:
             with open(self.local_img_path, 'wb') as img:
                 img_url = requests.get(self.img_url)
                 img.write(img_url.content)
+                print("Saved" + str(self.local_img_path))
 
-        Comic.__fix_broken_jpg(self.local_img_path)
 
-        return self.local_img_path
+    def _fix_broken_jpg(self):
+        """
+        Check if image is missing file-final image data
+        (as is the case with #363)
+        Solution adapted from https://stackoverflow.com/a/68918602/12662447
+        """
+        with open(self.local_img_path, 'rb') as imgfile:
+            imgfile.seek(-2,2)
+            # If end of file is different than expected, overwrite
+            if imgfile.read() != b'\xff\xd9':
+                cv2.imwrite(str(self.local_img_path), self.img)
+
 
     @staticmethod
-    def __fix_broken_jpg(img_path):
-        """Check if image is missing file-final image data
-        (as is the case with #363)
-        Solution adapted from https://stackoverflow.com/a/68918602/12662447"""
-        with open(img_path, 'rb') as imgopen:
-            imgopen.seek(-2,2)
-            # If end of file is different than expected, overwrite
-            if imgopen.read() != b'\xff\xd9':
-                im = cv2.imread(str(img_path))
-                cv2.imwrite(str(img_path), im)
+    def _get_contour_precedence(contour, cols):
+        """
+        Used for sorting panel frames wequentially, especially those that
+        don't fall neatly in the Cartesian plane when there are more than three
+        panels.
+        This function comes from https://stackoverflow.com/a/39445901
+        """
+        tolerance_factor = 50
+        origin = cv2.boundingRect(contour)
+        return (origin[1] // tolerance_factor) * cols + origin[0]
 
-    ### OCR ###
 
-    def find_frames(self):
+    def find_panel_frames(
+        self,
+        save_thresh: bool = False,
+        save_blur = False
+    ) -> np.ndarray:
         """
         Identify the boundaries of individual panels
         """
-
         # Load locally-saved image
-        im = cv2.imread(str(self.local_img_path), cv2.IMREAD_UNCHANGED)
+        img = cv2.imread(str(self.local_img_path), cv2.IMREAD_UNCHANGED)
 
         # Create greyscale version
         # IF it has a color layer (i.e. not already only grey)
         # im.shape is rows, columns, channels (if color) or rows, columns (grey)
         grey = (
-            im if len(im.shape) == 2
-            else cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+            img if len(img.shape) == 2
+            else cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         )
 
         # Threshold to get binary black-and-white
         _, framethresh = cv2.threshold(grey, 40, 255, cv2.THRESH_BINARY)
         # Check threshold result by saving image
-        # cv2.imwrite(f'comics/{self.id:04d}_{self.filename}_thresh.jpg',
-        #             framethresh)
+        if save_thresh:
+            cv2.imwrite(
+                filename = (
+                    f'{self.id:04d}_{self.filename.split(".")[0]}_thresh'
+                    '.jpg'
+                ),
+                img = framethresh
+            )
         # Median filter to remove jpg noise
         framethresh = cv2.medianBlur(framethresh, 3)
-        # cv2.imwrite(f'comics/{self.id:04d}_{self.filename}_blur.jpg',
-        #             framethresh)
-        # Find contours
-        contours, _ = cv2.findContours(framethresh,
-                                       cv2.RETR_LIST,
-                                       cv2.CHAIN_APPROX_SIMPLE)
+        if save_blur:
+            cv2.imwrite(
+                filename = (
+                    f'{self.id:04d}_{self.filename.split(".")[0]}_blur'
+                    '.jpg'
+                ),
+                img = framethresh
+            )
 
-        # This function comes from https://stackoverflow.com/a/39445901
-        def get_contour_precedence(contour, cols):
-            tolerance_factor = 50
-            origin = cv2.boundingRect(contour)
-            return (origin[1] // tolerance_factor) * cols + origin[0]
+        # Find contours
+        contours, _ = cv2.findContours(
+            framethresh,
+            cv2.RETR_LIST,
+            cv2.CHAIN_APPROX_SIMPLE
+        )
 
         contours = list(contours)
-        contours.sort(key=lambda x: get_contour_precedence(x, im.shape[0]))
+        contours.sort(
+            key=lambda x: self._get_contour_precedence(x, img.shape[0])
+        )
 
         # Heavily gutted from https://stackoverflow.com/a/56473372
         # Create empty list for contours of frames
         contour_shortlist = []
         # Identify frames by including only contours with sufficient area
+
         for i in range(1, len(contours)):
             area = cv2.contourArea(contours[i])
+
             # TODO Test if this threshold leaves any false negatives/positives:
             #  1) check whether frames are multiples of three and
             #  2) check that all OCR words are in exactly one frame
+
             if area > 50000:
                 # Get minimal points instead of all
                 box = cv2.minAreaRect(contours[i])
@@ -181,21 +240,24 @@ class Comic:
         # Convert entire list to contour ndarray
         contour_shortlist = np.array(contour_shortlist, dtype=np.int32)
 
-        self.frame_contours = contour_shortlist
+        self.panel_frame_contours = contour_shortlist
         return contour_shortlist
+
 
     def find_textboxes(self):
         """"""
-        self.download_jpg()
-        im = cv2.imread(str(self.local_img_path), cv2.IMREAD_UNCHANGED)
+        #self.download_jpg()
+        img = cv2.imread(str(self.local_img_path), cv2.IMREAD_UNCHANGED)
         grey = (
-            im if len(im.shape) == 2
-            else cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+            img if len(img.shape) == 2
+            else cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         )
         _, textboxthresh = cv2.threshold(grey, 230, 255, cv2.THRESH_BINARY)
-        contours, _ = cv2.findContours(framethresh,
-                                       cv2.RETR_LIST,
-                                       cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(
+            textboxthresh,
+            cv2.RETR_LIST,
+            cv2.CHAIN_APPROX_SIMPLE
+        )
 
         # Identify frames by including only contours with sufficient area
         contour_shortlist = []
@@ -206,22 +268,30 @@ class Comic:
         # Convert entire list to contour ndarray
         contour_shortlist = np.array(contour_shortlist, dtype=np.int32)
 
-        cv2.drawContours(textboxthresh, contour_shortlist, -1, (255, 255, 0), 2)
+        cv2.drawContours(
+            image = img,
+            contours = contour_shortlist,
+            contourIdx = -1,
+            color = (255, 255, 0),
+            thickness = 2
+        )
 
         cv2.imwrite(f'comics/{self.id:04d}_textthresh.jpg',
                     textboxthresh)
-        self.text_boxes = contour_shortlist
+
         return contour_shortlist
 
-    def read_text(self):
-        """Detects text in the file."""
+
+    def read_text(self) -> Sequence:
+        """
+        Use Google Vision OCR to read text in the image.
+        """
 
         with io.open(self.local_img_path, 'rb') as image_file:
             content = image_file.read()
-        image = vision.Image(content=content)
+        image = vision.Image(content = content)
 
-        client = vision.ImageAnnotatorClient()
-        response = client.text_detection(image=image)
+        response = Comic.CLIENT.text_detection(image = image)
         texts = response.text_annotations
         #print('\n"{}"'.format(texts[0].description))
         # Keeping this print line here to reference the description object
@@ -232,12 +302,14 @@ class Comic:
                 'https://cloud.google.com/apis/design/errors'.format(
                     response.error.message))
 
-        self.ocr_text = texts
         return texts
 
-    def text2coords(self):
-        """Create cv2 contour list from texts coordinates,
-        Reference: https://stackoverflow.com/questions/14161331/"""
+
+    def _text2coords(self):
+        """
+        Create cv2 contour list from texts coordinates,
+        Reference: https://stackoverflow.com/questions/14161331/
+        """
         word_contours = []  # for storing all words
         word_points = []
 
@@ -268,32 +340,50 @@ class Comic:
         self.ocr_points = word_points
         return word_contours, word_points
 
+
     # Check for word location within frame contours, add corresponding text
-    # TODO: add assign_frametext to read_text() if there are frame contours
-    def assign_frametext(self):
-        self.text2coords()
+    def assign_paneltext(self):
+        """
+        """
+        self._text2coords()
         text_by_frame = []
-        for j in range(len(self.frame_contours)):
+        for j in range(len(self.panel_frame_contours)):
             text_by_frame.append([])
             for k in range(1, len(self.ocr_points)):
                 # Check if text is inside frame;
                 # pointPolygonTest returns 1 if yes
-                if cv2.pointPolygonTest(contour=self.frame_contours[j],
-                                        pt=tuple(self.ocr_points[k]),
-                                        measureDist=False) > 0:
+                if cv2.pointPolygonTest(
+                    contour = self.panel_frame_contours[j],
+                    pt = tuple(self.ocr_points[k]),
+                    measureDist=False
+                ) > 0:
                     text_by_frame[j].append(self.ocr_text[k].description)
             # Join separate list items into a single string
             text_by_frame[j] = ' '.join(text_by_frame[j])
         # get rid of empty strings for frames without text
         text_by_frame[:] = [x for x in text_by_frame if x != '']
-        self.frame_text = text_by_frame
         return text_by_frame
 
+
     def saveContourImage(self):
-        """Testing that drawContour successfully places both contour groups"""
-        img = cv2.imread(str(self.local_img_path), cv2.IMREAD_UNCHANGED)
-        cv2.drawContours(img, self.frame_contours, -1, (255, 255, 0), 2)
-        cv2.drawContours(img, self.ocr_contours, -1, (255, 0, 255), 2)
+        """
+        Testing that drawContour successfully places both contour groups
+        """
+        img = self.img.copy()
+        cv2.drawContours(
+            image = img,
+            contours = self.panel_frame_contours,
+            contourIdx = -1,
+            color = (255, 255, 0),
+            thickness = 2
+        )
+        cv2.drawContours(
+            image = img,
+            contours = self.ocr_contours,
+            contourIdx = -1,
+            color = (255, 0, 255),
+            thickness = 2
+        )
         for point in self.ocr_points:
             cv2.circle(img,
                        tuple(point),
@@ -305,11 +395,16 @@ class Comic:
         # cv2.imshow('circle', img)
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
-        save_loc = (Path(save_dest_folder) /
-                    f'{self.id:04d}_{self.filename.split(".")[0]}_contours'
-                    '.jpg'
-                    )
+        save_loc = (
+            Path(self.SAVE_DEST_FOLDER) /
+            f'{self.id:04d}_{self.filename.split(".")[0]}_contours'
+            '.jpg'
+        )
         cv2.imwrite(str(save_loc), img)
+        # cv2.imshow('contours', img)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
+
 
     def parse(self):
         # TODO make a static variable?
@@ -318,8 +413,31 @@ class Comic:
         # for sentence in doc.sentences:
             # print(sentence.constituency)
 
-if __name__ == '__main__':
 
+    def __repr__(self) -> str:
+        """
+        The text displayed when printing an instance of our sentence.
+        """
+        return f"""
+        self.id:                   {self.id}
+        self.url:                  {self.url}
+        self.soup:                 {len(self.soup)}
+        self.img_url:              {self.img_url}
+        self.alt_text:             {self.alt_text}
+        self.filename:             {self.filename}
+        self.local_img_path:       {self.local_img_path}
+        self.img:                  {len(self.img)}
+        self.panel_frame_contours: {len(self.panel_frame_contours)}
+        self.text_boxes:           {len(self.text_boxes)}
+        self.ocr_text:             {len(self.ocr_text)}
+        self.ocr_contours:         {len(self.ocr_contours)}
+        self.ocr_points:           {len(self.ocr_points)}
+        self.frame_text:           {len(self.frame_text)}
+        self.sentences:            {(self.sentences)}
+        """
+    
+
+if __name__ == '__main__':
 
     # If json data already exists, load it
     if Path(JSONFILE).is_file():
@@ -336,16 +454,13 @@ if __name__ == '__main__':
 
         if comicdictkey not in comicsjson:
             comic = Comic(i)
-            comic.download_jpg()
-            comic.find_frames()
-            comic.read_text()
-            comic.assign_frametext()
+            comic.process_comic()
         # store key info
             comicsjson[comicdictkey] = {}
             comicsjson[comicdictkey]['alt_text'] = comic.alt_text
             comicsjson[comicdictkey]['comic_number'] = comic.id
             comicsjson[comicdictkey]['frame_text'] = comic.frame_text
-            comicsjson[comicdictkey]['save_loc'] = str(comic.save_loc)
+            comicsjson[comicdictkey]['save_loc'] = str(comic.local_img_path)
         # show us what you got
             comic.saveContourImage()
             for line in comic.frame_text:
