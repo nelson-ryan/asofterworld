@@ -91,6 +91,11 @@ class Comic:
         """
         self.download_jpg()
         self.img = cv2.imread(str(self.local_img_path))
+        self.img_grey = (
+            self.img.copy() if len(self.img.shape) == 2
+            else cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
+        )
+        self.img_cont = self.img.copy()
         self._fix_broken_jpg()
         self.ocr_text = self.read_text()
         self.panel_frame_contours = self.find_panel_frames()
@@ -99,12 +104,12 @@ class Comic:
         return
 
 
-    def show_img(self, img = None) -> None:
+    @staticmethod
+    def show_img(img) -> None:
         """
         Display whichever image in a temporary window.
         """
-        img = self.img if not img else img
-        cv2.imshow(self.alt_text, img)
+        cv2.imshow('img', img)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
         return None
@@ -176,16 +181,9 @@ class Comic:
         # Load locally-saved image
         img = cv2.imread(str(self.local_img_path), cv2.IMREAD_UNCHANGED)
 
-        # Create greyscale version
-        # IF it has a color layer (i.e. not already only grey)
-        # im.shape is rows, columns, channels (if color) or rows, columns (grey)
-        grey = (
-            img if len(img.shape) == 2
-            else cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        )
-
         # Threshold to get binary black-and-white
-        _, framethresh = cv2.threshold(grey, 40, 255, cv2.THRESH_BINARY)
+        _, framethresh = cv2.threshold(self.img_grey, 40, 255, cv2.THRESH_BINARY)
+
         # Check threshold result by saving image
         if save_thresh:
             cv2.imwrite(
@@ -240,7 +238,14 @@ class Comic:
         # Convert entire list to contour ndarray
         contour_shortlist = np.array(contour_shortlist, dtype=np.int32)
 
-        self.panel_frame_contours = contour_shortlist
+        cv2.drawContours(
+            image = self.img_cont,
+            contours = contour_shortlist,
+            contourIdx = -1,
+            color = (255, 255, 0),
+            thickness = 2
+        )
+
         return contour_shortlist
 
 
@@ -248,11 +253,8 @@ class Comic:
         """"""
         #self.download_jpg()
         img = cv2.imread(str(self.local_img_path), cv2.IMREAD_UNCHANGED)
-        grey = (
-            img if len(img.shape) == 2
-            else cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        )
-        _, textboxthresh = cv2.threshold(grey, 230, 255, cv2.THRESH_BINARY)
+
+        _, textboxthresh = cv2.threshold(self.img_grey, 230, 255, cv2.THRESH_BINARY)
         contours, _ = cv2.findContours(
             textboxthresh,
             cv2.RETR_LIST,
@@ -269,7 +271,7 @@ class Comic:
         contour_shortlist = np.array(contour_shortlist, dtype=np.int32)
 
         cv2.drawContours(
-            image = img,
+            image = self.img_cont,
             contours = contour_shortlist,
             contourIdx = -1,
             color = (255, 255, 0),
@@ -337,8 +339,24 @@ class Comic:
         word_contours = np.array(word_contours, dtype=np.int32)
 
         self.ocr_contours = word_contours
+        cv2.drawContours(
+            image = self.img_cont,
+            contours = self.ocr_contours,
+            contourIdx = -1,
+            color = (255, 0, 255),
+            thickness = 2
+        )
+
         self.ocr_points = word_points
-        return word_contours, word_points
+        for point in self.ocr_points:
+            cv2.circle(self.img_cont,
+                       tuple(point),
+                       radius=1,
+                       color=(0, 255, 0),
+                       thickness=2
+            )
+
+        #return word_contours, word_points
 
 
     # Check for word location within frame contours, add corresponding text
@@ -370,27 +388,6 @@ class Comic:
         Testing that drawContour successfully places both contour groups
         """
         img = self.img.copy()
-        cv2.drawContours(
-            image = img,
-            contours = self.panel_frame_contours,
-            contourIdx = -1,
-            color = (255, 255, 0),
-            thickness = 2
-        )
-        cv2.drawContours(
-            image = img,
-            contours = self.ocr_contours,
-            contourIdx = -1,
-            color = (255, 0, 255),
-            thickness = 2
-        )
-        for point in self.ocr_points:
-            cv2.circle(img,
-                       tuple(point),
-                       radius=1,
-                       color=(0, 255, 0),
-                       thickness=2
-            )
         # Display for testing purposes
         # cv2.imshow('circle', img)
         # cv2.waitKey(0)
