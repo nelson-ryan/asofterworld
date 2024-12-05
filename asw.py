@@ -60,7 +60,7 @@ class Comic:
         """
         self.id: int = number
         self.url: str = self.BASE_URL + str(self.id)
-        self.soup: bs4.element.Tag = self.get_soup()
+        self.soup: bs4.element.Tag = self._get_soup()
         try:
             self.img_url: str = str(self.soup.get('src'))
         except IndexError:
@@ -89,33 +89,35 @@ class Comic:
         """
         Full sequence for each comic.
         """
-        self.download_jpg()
+        self._download_jpg()
         self.img = cv2.imread(str(self.local_img_path))
         self.img_grey = (
             self.img.copy() if len(self.img.shape) == 2
             else cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
         )
-        self.img_cont = self.img.copy()
+        self.img_contoured = self.img.copy()
         self._fix_broken_jpg()
         self.ocr_text = self.read_text()
         self.panel_frame_contours = self.find_panel_frames()
+        self.show_img("frames")
         self.text_boxes = self.find_textboxes()
-        self.frame_text = self.assign_paneltext()
+        self.show_img("text boxes")
+        self.frame_text = self._assign_frame_text()
+        self.show_img("text points")
         return
 
 
-    @staticmethod
-    def show_img(img) -> None:
+    def show_img(self, label) -> None:
         """
         Display whichever image in a temporary window.
         """
-        cv2.imshow('img', img)
+        cv2.imshow(label, self.img_contoured)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
         return None
 
 
-    def get_soup(self) -> bs4.element.Tag:
+    def _get_soup(self) -> bs4.element.Tag:
         """
         Retrieve remote html from which to pull info.
         """
@@ -128,7 +130,7 @@ class Comic:
         return soup_element_tag
 
 
-    def download_jpg(self):
+    def _download_jpg(self):
         """
         Exactly what it says on the tin,
         if the image isn't already saved locally
@@ -239,7 +241,7 @@ class Comic:
         contour_shortlist = np.array(contour_shortlist, dtype=np.int32)
 
         cv2.drawContours(
-            image = self.img_cont,
+            image = self.img_contoured,
             contours = contour_shortlist,
             contourIdx = -1,
             color = (255, 255, 0),
@@ -250,9 +252,11 @@ class Comic:
 
 
     def find_textboxes(self):
-        """"""
-        #self.download_jpg()
-        img = cv2.imread(str(self.local_img_path), cv2.IMREAD_UNCHANGED)
+        """I think the goal here is to better identify actual comic text
+        versus anything in the photo
+        This copies much from find_panel_frames
+        Seems to work for comic #8
+        """
 
         _, textboxthresh = cv2.threshold(self.img_grey, 230, 255, cv2.THRESH_BINARY)
         contours, _ = cv2.findContours(
@@ -271,7 +275,7 @@ class Comic:
         contour_shortlist = np.array(contour_shortlist, dtype=np.int32)
 
         cv2.drawContours(
-            image = self.img_cont,
+            image = self.img_contoured,
             contours = contour_shortlist,
             contourIdx = -1,
             color = (255, 255, 0),
@@ -340,7 +344,7 @@ class Comic:
 
         self.ocr_contours = word_contours
         cv2.drawContours(
-            image = self.img_cont,
+            image = self.img_contoured,
             contours = self.ocr_contours,
             contourIdx = -1,
             color = (255, 0, 255),
@@ -349,7 +353,7 @@ class Comic:
 
         self.ocr_points = word_points
         for point in self.ocr_points:
-            cv2.circle(self.img_cont,
+            cv2.circle(self.img_contoured,
                        tuple(point),
                        radius=1,
                        color=(0, 255, 0),
@@ -360,26 +364,31 @@ class Comic:
 
 
     # Check for word location within frame contours, add corresponding text
-    def assign_paneltext(self):
+    def _assign_frame_text(self):
         """
+        Group text according to which frame it appears in.
+
+        Iterates through each panel contour, then checks each word's location
+        for whether it's within the frame's bounds.
+
         """
         self._text2coords()
         text_by_frame = []
-        for j in range(len(self.panel_frame_contours)):
-            text_by_frame.append([])
-            for k in range(1, len(self.ocr_points)):
+        for panel_frame_contour in self.panel_frame_contours:
+            current_frame_text = []
+            for text, ocr_point in zip(self.ocr_text[1:], self.ocr_points[1:]):
                 # Check if text is inside frame;
                 # pointPolygonTest returns 1 if yes
                 if cv2.pointPolygonTest(
-                    contour = self.panel_frame_contours[j],
-                    pt = tuple(self.ocr_points[k]),
+                    contour = panel_frame_contour,
+                    pt = tuple(ocr_point),
                     measureDist=False
                 ) > 0:
-                    text_by_frame[j].append(self.ocr_text[k].description)
-            # Join separate list items into a single string
-            text_by_frame[j] = ' '.join(text_by_frame[j])
+                    current_frame_text.append(text.description)
+            # Join separate list items into a single string and append
+            text_by_frame.append(' '.join(current_frame_text))
         # get rid of empty strings for frames without text
-        text_by_frame[:] = [x for x in text_by_frame if x != '']
+        text_by_frame = [x for x in text_by_frame if x != '']
         return text_by_frame
 
 
