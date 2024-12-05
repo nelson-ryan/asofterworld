@@ -22,6 +22,8 @@ for sentence in doc.sentences:
 # TODO: Compare Stanza constituents to comic frame boundaries.
 # TODO: Quantify
 # TODO: Visualize
+import timeit
+start = timeit.default_timer()
 
 import requests
 import io
@@ -48,7 +50,7 @@ class Comic:
     """
     ASofterWorld individual comic object.
     """
-    nlp = stanza.Pipeline(lang='en', processors='tokenize,pos,constituency')
+    NLP = stanza.Pipeline(lang='en', processors='tokenize,pos,constituency')
     BASE_URL = 'https://www.asofterworld.com/index.php?id='
 
     IMG_FOLDER = 'comics'
@@ -75,11 +77,11 @@ class Comic:
         self.img: np.ndarray = np.array(None)
 
         self.panel_contours = []
-        self.text_boxes = []
+        self.textboxes = []
         self.ocr_text: Sequence = []
         self.ocr_contours: Sequence = []
         self.ocr_points: Sequence = []
-        self.frame_text: list = []
+        self.panel_text: list = []
         self.sentences = None # added by self.parse(), this shows a parsed
                               # constituency, though in a form that likely
                               # isn't immediately useful, but promising
@@ -97,17 +99,17 @@ class Comic:
         )
         self.img_contoured = self.img.copy()
         self._fix_broken_jpg()
-        self.ocr_text = self.read_text()
-        self.panel_contours = self.find_panel_contours()
-        self.show_img("frames")
-        self.text_boxes = self.find_textboxes()
-        self.show_img("text boxes")
-        self.frame_text = self._assign_frame_text()
-        self.show_img("text points")
+        self.ocr_text = self._read_text()
+        self.panel_contours = self._find_panel_contours()
+        # self.show_img("frames")
+        self.textboxes = self._find_textboxes()
+        # self.show_img("text boxes")
+        self.panel_text = self._assign_panel_text()
+        # self.show_img("text points")
         return
 
 
-    def show_img(self, label) -> None:
+    def show_img(self, label = "img") -> None:
         """
         Display whichever image in a temporary window.
         """
@@ -143,7 +145,7 @@ class Comic:
             with open(self.local_img_path, 'wb') as img:
                 img_url = requests.get(self.img_url)
                 img.write(img_url.content)
-                print("Saved" + str(self.local_img_path))
+                print("Saved " + str(self.local_img_path))
 
 
     def _fix_broken_jpg(self):
@@ -172,7 +174,7 @@ class Comic:
         return (origin[1] // tolerance_factor) * cols + origin[0]
 
 
-    def find_panel_contours(
+    def _find_panel_contours(
         self,
         save_thresh: bool = False,
         save_blur = False
@@ -215,16 +217,16 @@ class Comic:
         )
 
         # Heavily gutted from https://stackoverflow.com/a/56473372
-        # Create empty list for contours of frames
+        # Create empty list for contours of panels
         panel_contours = []
-        # Identify frames by including only contours with sufficient area
+        # Identify panels by including only contours with sufficient area
 
         for i in range(1, len(contours)):
             area = cv2.contourArea(contours[i])
 
             # TODO Test if this threshold leaves any false negatives/positives:
-            #  1) check whether frames are multiples of three and
-            #  2) check that all OCR words are in exactly one frame
+            #  1) check whether panels are multiples of three and
+            #  2) check that all OCR words are in exactly one panel
 
             if area > 50000:
                 # Get minimal points instead of all
@@ -247,10 +249,10 @@ class Comic:
         return panel_contours
 
 
-    def find_textboxes(self):
+    def _find_textboxes(self):
         """I think the goal here is to better identify actual comic text
         versus anything in the photo
-        This copies much from find_panel_contours
+        This copies much from _find_panel_contours
         Seems to work for comic #8
         """
 
@@ -261,7 +263,7 @@ class Comic:
             method = cv2.CHAIN_APPROX_SIMPLE
         )
 
-        # Identify frames by including only contours with sufficient area
+        # Identify panels by including only contours with sufficient area
         textbox_contours = []
         textbox_contours = [
                 cv2.boxPoints(cv2.minAreaRect(c)) for c in contours
@@ -284,7 +286,7 @@ class Comic:
         return textbox_contours
 
 
-    def read_text(self) -> Sequence:
+    def _read_text(self) -> Sequence:
         """
         Use Google Vision OCR to read text in the image.
         """
@@ -310,6 +312,9 @@ class Comic:
     def _text2coords(self):
         """
         Create cv2 contour list from texts coordinates,
+        Called by _assign_panel_text()
+        Defines values for self.ocr_contours and self.ocr_points
+
         Reference: https://stackoverflow.com/questions/14161331/
         """
         word_contours = []  # for storing all words
@@ -320,6 +325,7 @@ class Comic:
             word_Xs = []
             word_Ys = []
 
+            # convert to center point?
             # Put each vertex pair into a list pair & add to a list of vertices
             for vertex in text.bounding_poly.vertices:
                 # Storing individual vertex coordinates for a word
@@ -359,41 +365,59 @@ class Comic:
         #return word_contours, word_points
 
 
-    # Check for word location within frame contours, add corresponding text
-    def _assign_frame_text(self):
+    # Check for word location within panel contours, add corresponding text
+    def _assign_panel_text(self):
         """
-        Group text according to which frame it appears in.
+        Group text according to which panel it appears in.
 
         Iterates through each panel contour, then checks each word's location
-        for whether it's within the frame's bounds.
+        for whether it's within the panel's bounds.
 
         """
         #TODO also check for overlap with textboxes
+        # FIRST assign textboxes to panels, though
         self._text2coords()
-        text_by_frame = []
-        for panel_frame_contour in self.panel_contours:
-            current_frame_text = []
-            for text, ocr_point in zip(self.ocr_text[1:], self.ocr_points[1:]):
-                # Check if text is inside frame;
-                # pointPolygonTest returns 1 if yes
-                if cv2.pointPolygonTest(
-                    contour = panel_frame_contour,
+        text_by_panel = []
+        for panel_contour in self.panel_contours:
+            textboxes = [
+            ]
+            current_panel_text = [
+                text.description
+                for text, ocr_point
+                in zip(self.ocr_text[1:], self.ocr_points[1:])
+                # Check if text is inside panel;
+                # pointPolygonTest returns 1 if inside, -1 if outside, 0 if edge
+                if
+                cv2.pointPolygonTest(
+                    contour = panel_contour,
                     pt = tuple(ocr_point),
                     measureDist=False
-                ) > 0:
-                    current_frame_text.append(text.description)
+                ) > 0
+                and 
+                # This is where the text is filtered for matching with textboxes
+                # TODO Probably not so efficient, though;
+                # TODO First reduce set of textboxes to only those in current panel
+                any(
+                    cv2.pointPolygonTest(
+                        contour = textbox,
+                        pt = tuple(ocr_point),
+                        measureDist=False
+                    ) > 0
+                    for textbox in self.textboxes
+                )
+            ]
             # Join separate list items into a single string and append
-            text_by_frame.append(' '.join(current_frame_text))
-        # get rid of empty strings for frames without text
-        text_by_frame = [x for x in text_by_frame if x != '']
-        return text_by_frame
+            text_by_panel.append(' '.join(current_panel_text))
+        # get rid of empty strings for panels without text
+        # (Why not keep it, though?)
+        text_by_panel[:] = [x for x in text_by_panel if x != '']
+        return text_by_panel
 
 
-    def saveContourImage(self):
+    def _saveContourImage(self):
         """
         Testing that drawContour successfully places both contour groups
         """
-        img = self.img.copy()
         # Display for testing purposes
         # cv2.imshow('circle', img)
         # cv2.waitKey(0)
@@ -403,7 +427,7 @@ class Comic:
             f'{self.id:04d}_{self.filename.split(".")[0]}_contours'
             '.jpg'
         )
-        cv2.imwrite(str(save_loc), img)
+        cv2.imwrite(str(save_loc), self.img_contoured)
         # cv2.imshow('contours', img)
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
@@ -411,7 +435,7 @@ class Comic:
 
     def parse(self):
         # TODO make a static variable?
-        doc = Comic.nlp(' '.join(self.frame_text))
+        doc = Comic.NLP(' '.join(self.panel_text))
         self.sentences = [x.constituency for x in doc.sentences]
         # for sentence in doc.sentences:
             # print(sentence.constituency)
@@ -422,22 +446,22 @@ class Comic:
         The text displayed when printing an instance of our sentence.
         """
         return f"""
-        self.id:                   {self.id}
-        self.url:                  {self.url}
-        self.soup:                 {len(self.soup)}
-        self.img_url:              {self.img_url}
-        self.alt_text:             {self.alt_text}
-        self.filename:             {self.filename}
-        self.local_img_path:       {self.local_img_path}
-        self.img:                  {len(self.img)}
-        self.panel_contours: {len(self.panel_contours)}
-        self.text_boxes:           {len(self.text_boxes)}
-        self.ocr_text:             {len(self.ocr_text)}
-        self.ocr_contours:         {len(self.ocr_contours)}
-        self.ocr_points:           {len(self.ocr_points)}
-        self.frame_text:           {len(self.frame_text)}
-        self.sentences:            {(self.sentences)}
-        """
+    self.id:              {self.id}
+    self.url:             {self.url}
+    self.soup:            {len(self.soup)}
+    self.img_url:         {self.img_url}
+    self.alt_text:        {self.alt_text}
+    self.filename:        {self.filename}
+    self.local_img_path:  {self.local_img_path}
+    self.img:             {len(self.img)}
+    self.panel_contours:  {len(self.panel_contours)}
+    self.textboxes:       {len(self.textboxes)}
+    self.ocr_text:        {len(self.ocr_text)}
+    self.ocr_contours:    {len(self.ocr_contours)}
+    self.ocr_points:      {len(self.ocr_points)}
+    self.panel_text:      {len(self.panel_text)}
+    self.sentences:       {(self.sentences)}
+"""
     
 
 if __name__ == '__main__':
@@ -462,11 +486,11 @@ if __name__ == '__main__':
             comicsjson[comicdictkey] = {}
             comicsjson[comicdictkey]['alt_text'] = comic.alt_text
             comicsjson[comicdictkey]['comic_number'] = comic.id
-            comicsjson[comicdictkey]['frame_text'] = comic.frame_text
+            comicsjson[comicdictkey]['panel_text'] = comic.panel_text
             comicsjson[comicdictkey]['save_loc'] = str(comic.local_img_path)
         # show us what you got
-            comic.saveContourImage()
-            for line in comic.frame_text:
+            comic._saveContourImage()
+            for line in comic.panel_text:
                 if ('comeau' in line) or ('asofterworld' in line):
                     raise Exception(f'false positive in {comicdictkey}')
             comics.append(comic)
@@ -476,3 +500,8 @@ if __name__ == '__main__':
 
     with open('comics.json', 'w') as write_file:
         json.dump(comicsjson, write_file, sort_keys=True)
+
+
+    end = timeit.default_timer()
+    print(end - start)
+    print((end - start)/60)
