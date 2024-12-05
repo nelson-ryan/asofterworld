@@ -74,7 +74,7 @@ class Comic:
         # 
         self.img: np.ndarray = np.array(None)
 
-        self.panel_frame_contours = []
+        self.panel_contours = []
         self.text_boxes = []
         self.ocr_text: Sequence = []
         self.ocr_contours: Sequence = []
@@ -98,7 +98,7 @@ class Comic:
         self.img_contoured = self.img.copy()
         self._fix_broken_jpg()
         self.ocr_text = self.read_text()
-        self.panel_frame_contours = self.find_panel_frames()
+        self.panel_contours = self.find_panel_contours()
         self.show_img("frames")
         self.text_boxes = self.find_textboxes()
         self.show_img("text boxes")
@@ -172,7 +172,7 @@ class Comic:
         return (origin[1] // tolerance_factor) * cols + origin[0]
 
 
-    def find_panel_frames(
+    def find_panel_contours(
         self,
         save_thresh: bool = False,
         save_blur = False
@@ -180,8 +180,6 @@ class Comic:
         """
         Identify the boundaries of individual panels
         """
-        # Load locally-saved image
-        img = cv2.imread(str(self.local_img_path), cv2.IMREAD_UNCHANGED)
 
         # Threshold to get binary black-and-white
         _, framethresh = cv2.threshold(self.img_grey, 40, 255, cv2.THRESH_BINARY)
@@ -190,8 +188,7 @@ class Comic:
         if save_thresh:
             cv2.imwrite(
                 filename = (
-                    f'{self.id:04d}_{self.filename.split(".")[0]}_thresh'
-                    '.jpg'
+                    f'{self.id:04d}_{self.filename.split(".")[0]}_thresh.jpg'
                 ),
                 img = framethresh
             )
@@ -200,27 +197,26 @@ class Comic:
         if save_blur:
             cv2.imwrite(
                 filename = (
-                    f'{self.id:04d}_{self.filename.split(".")[0]}_blur'
-                    '.jpg'
+                    f'{self.id:04d}_{self.filename.split(".")[0]}_blur.jpg'
                 ),
                 img = framethresh
             )
 
         # Find contours
         contours, _ = cv2.findContours(
-            framethresh,
-            cv2.RETR_LIST,
-            cv2.CHAIN_APPROX_SIMPLE
+            image = framethresh,
+            mode = cv2.RETR_LIST,
+            method = cv2.CHAIN_APPROX_SIMPLE
         )
 
         contours = list(contours)
         contours.sort(
-            key=lambda x: self._get_contour_precedence(x, img.shape[0])
+            key = lambda x: self._get_contour_precedence(x, self.img.shape[0])
         )
 
         # Heavily gutted from https://stackoverflow.com/a/56473372
         # Create empty list for contours of frames
-        contour_shortlist = []
+        panel_contours = []
         # Identify frames by including only contours with sufficient area
 
         for i in range(1, len(contours)):
@@ -236,47 +232,47 @@ class Comic:
                 # Convert tuple to contour ndarray
                 box = cv2.boxPoints(box)
                 # Add to output
-                contour_shortlist.append(box)
+                panel_contours.append(box)
         # Convert entire list to contour ndarray
-        contour_shortlist = np.array(contour_shortlist, dtype=np.int32)
+        panel_contours = np.array(panel_contours, dtype=np.int32)
 
         cv2.drawContours(
             image = self.img_contoured,
-            contours = contour_shortlist,
+            contours = panel_contours,
             contourIdx = -1,
             color = (255, 255, 0),
             thickness = 2
         )
 
-        return contour_shortlist
+        return panel_contours
 
 
     def find_textboxes(self):
         """I think the goal here is to better identify actual comic text
         versus anything in the photo
-        This copies much from find_panel_frames
+        This copies much from find_panel_contours
         Seems to work for comic #8
         """
 
         _, textboxthresh = cv2.threshold(self.img_grey, 230, 255, cv2.THRESH_BINARY)
         contours, _ = cv2.findContours(
-            textboxthresh,
-            cv2.RETR_LIST,
-            cv2.CHAIN_APPROX_SIMPLE
+            image = textboxthresh,
+            mode = cv2.RETR_LIST,
+            method = cv2.CHAIN_APPROX_SIMPLE
         )
 
         # Identify frames by including only contours with sufficient area
-        contour_shortlist = []
-        contour_shortlist = [
+        textbox_contours = []
+        textbox_contours = [
                 cv2.boxPoints(cv2.minAreaRect(c)) for c in contours
                 if 300 < cv2.contourArea(c) < 50000
         ]
         # Convert entire list to contour ndarray
-        contour_shortlist = np.array(contour_shortlist, dtype=np.int32)
+        textbox_contours = np.array(textbox_contours, dtype=np.int32)
 
         cv2.drawContours(
             image = self.img_contoured,
-            contours = contour_shortlist,
+            contours = textbox_contours,
             contourIdx = -1,
             color = (255, 255, 0),
             thickness = 2
@@ -285,7 +281,7 @@ class Comic:
         cv2.imwrite(f'comics/{self.id:04d}_textthresh.jpg',
                     textboxthresh)
 
-        return contour_shortlist
+        return textbox_contours
 
 
     def read_text(self) -> Sequence:
@@ -372,9 +368,10 @@ class Comic:
         for whether it's within the frame's bounds.
 
         """
+        #TODO also check for overlap with textboxes
         self._text2coords()
         text_by_frame = []
-        for panel_frame_contour in self.panel_frame_contours:
+        for panel_frame_contour in self.panel_contours:
             current_frame_text = []
             for text, ocr_point in zip(self.ocr_text[1:], self.ocr_points[1:]):
                 # Check if text is inside frame;
@@ -433,7 +430,7 @@ class Comic:
         self.filename:             {self.filename}
         self.local_img_path:       {self.local_img_path}
         self.img:                  {len(self.img)}
-        self.panel_frame_contours: {len(self.panel_frame_contours)}
+        self.panel_contours: {len(self.panel_contours)}
         self.text_boxes:           {len(self.text_boxes)}
         self.ocr_text:             {len(self.ocr_text)}
         self.ocr_contours:         {len(self.ocr_contours)}
