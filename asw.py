@@ -258,7 +258,7 @@ class Comic:
 
         _, textboxthresh = cv2.threshold(
             src = self.img_grey,
-            thresh = 230,
+            thresh = 240,
             maxval = 255,
             type = cv2.THRESH_BINARY
         )
@@ -267,6 +267,7 @@ class Comic:
             mode = cv2.RETR_LIST,
             method = cv2.CHAIN_APPROX_SIMPLE
         )
+        self.img_tbt = textboxthresh
 
         # Identify panels by including only contours with sufficient area
         textbox_contours = []
