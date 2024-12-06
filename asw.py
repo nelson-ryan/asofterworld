@@ -190,7 +190,7 @@ class Comic:
         if save_thresh:
             cv2.imwrite(
                 filename = (
-                    f'{self.id:04d}_{self.filename.split(".")[0]}_thresh.jpg'
+                    f'comics/{self.id:04d}_{self.filename.split(".")[0]}_textthresh.jpg'
                 ),
                 img = framethresh
             )
@@ -256,7 +256,12 @@ class Comic:
         Seems to work for comic #8
         """
 
-        _, textboxthresh = cv2.threshold(self.img_grey, 230, 255, cv2.THRESH_BINARY)
+        _, textboxthresh = cv2.threshold(
+            src = self.img_grey,
+            thresh = 230,
+            maxval = 255,
+            type = cv2.THRESH_BINARY
+        )
         contours, _ = cv2.findContours(
             image = textboxthresh,
             mode = cv2.RETR_LIST,
@@ -280,8 +285,10 @@ class Comic:
             thickness = 2
         )
 
-        cv2.imwrite(f'comics/{self.id:04d}_textthresh.jpg',
-                    textboxthresh)
+        cv2.imwrite(
+            f'comics/{self.id:04d}_{self.filename.split(".")[0]}_textthresh.jpg',
+            textboxthresh
+        )
 
         return textbox_contours
 
