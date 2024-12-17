@@ -7,8 +7,6 @@ Created on Tue Oct 20 11:21:20 2020
 # Stanza
 # https://stanfordnlp.github.io/stanza/constituency.html
 
-# TODO: Instead of filtering OCR results for those positioned within text
-#       frames, filter OCR results for those positions within text boxes
 # TODO: Use Stanza (https://stanfordnlp.github.io/stanza/constituency.html) to
 #       parse into syntactic consituents
 #   1 get flat string from comic
@@ -272,8 +270,8 @@ class Comic:
         # Identify panels by including only contours with sufficient area
         textbox_contours = []
         textbox_contours = [
-                cv2.boxPoints(cv2.minAreaRect(c)) for c in contours
-                if 300 < cv2.contourArea(c) < 50000
+            cv2.boxPoints(cv2.minAreaRect(c)) for c in contours
+            if 200 < cv2.contourArea(c) < 50000
         ]
         # Convert entire list to contour ndarray
         textbox_contours = np.array(textbox_contours, dtype=np.int32)
