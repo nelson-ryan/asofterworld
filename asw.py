@@ -236,14 +236,6 @@ class Comic:
         # Convert entire list to contour ndarray
         panel_contours = np.array(panel_contours, dtype=np.int32)
 
-        cv2.drawContours(
-            image = self.img_contoured,
-            contours = panel_contours,
-            contourIdx = -1,
-            color = (255, 255, 0),
-            thickness = 2
-        )
-
         return panel_contours
 
 
@@ -276,18 +268,12 @@ class Comic:
         # Convert entire list to contour ndarray
         textbox_contours = np.array(textbox_contours, dtype=np.int32)
 
-        cv2.drawContours(
-            image = self.img_contoured,
-            contours = textbox_contours,
-            contourIdx = -1,
-            color = (255, 255, 0),
-            thickness = 2
-        )
-
         cv2.imwrite(
             f'comics/{self.id:04d}_{self.filename.split(".")[0]}_textthresh.jpg',
             textboxthresh
         )
+
+        self.draw_textbox_outlines()
 
         return textbox_contours
 
@@ -334,6 +320,7 @@ class Comic:
             # convert to center point?
             # Put each vertex pair into a list pair & add to a list of vertices
             for vertex in text.bounding_poly.vertices:
+
                 # Storing individual vertex coordinates for a word
                 word_vertex = [vertex.x, vertex.y]
                 word_vertices.append(word_vertex)
@@ -351,15 +338,29 @@ class Comic:
         word_contours = np.array(word_contours, dtype=np.int32)
 
         self.ocr_contours = word_contours
+        self.ocr_points = word_points
+
+        #return word_contours, word_points
+
+    def draw_panel_contours(self):
+        cv2.drawContours(
+            image = self.img_contoured,
+            contours = self.panel_contours,
+            contourIdx = -1,
+            color = (255, 255, 0),
+            thickness = 2
+        )
+
+    def draw_ocr_contours(self):
         cv2.drawContours(
             image = self.img_contoured,
             contours = self.ocr_contours,
             contourIdx = -1,
             color = (255, 0, 255),
-            thickness = 2
+            thickness = cv2.FILLED
         )
 
-        self.ocr_points = word_points
+    def draw_ocr_points(self):
         for point in self.ocr_points:
             cv2.circle(self.img_contoured,
                        tuple(point),
@@ -368,7 +369,14 @@ class Comic:
                        thickness=2
             )
 
-        #return word_contours, word_points
+    def draw_textbox_outlines(self):
+        cv2.drawContours(
+            image = self.img_contoured,
+            contours = self.textboxes,
+            contourIdx = -1,
+            color = (255, 255, 0),
+            thickness = 2
+        )
 
 
     # Check for word location within panel contours, add corresponding text
