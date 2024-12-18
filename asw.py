@@ -322,16 +322,15 @@ class Comic:
             for vertex in text.bounding_poly.vertices:
 
                 # Storing individual vertex coordinates for a word
-                word_vertex = [vertex.x, vertex.y]
-                word_vertices.append(word_vertex)
+                word_vertices.append([vertex.x, vertex.y])
+
                 word_Xs.append(vertex.x)
                 word_Ys.append(vertex.y)
-            point_X = int(sum(word_Xs)/len(word_Xs))
-            point_Y = int(sum(word_Ys)/len(word_Ys))
-            point = [point_X, point_Y]
             # Convert list to contour ndarray
             word_vertices = np.array(word_vertices, dtype=np.int32)
             word_contours.append(word_vertices)
+
+            point = [int(np.mean(word_Xs)), int(np.mean(word_Ys))]
             word_points.append(point)
 
         # Also convert final to contour ndarray
@@ -450,9 +449,7 @@ class Comic:
     def parse(self):
         # TODO make a static variable?
         doc = Comic.NLP(' '.join(self.panel_text))
-        self.sentences = [x.constituency for x in doc.sentences]
-        # for sentence in doc.sentences:
-            # print(sentence.constituency)
+        self.sentences = [sent.constituency for sent in doc.sentences]
 
 
     def __repr__(self) -> str:
@@ -460,22 +457,13 @@ class Comic:
         The text displayed when printing an instance of our sentence.
         """
         return f"""
-    self.id:              {self.id}
-    self.url:             {self.url}
-    self.soup:            {len(self.soup)}
-    self.img_url:         {self.img_url}
-    self.alt_text:        {self.alt_text}
-    self.filename:        {self.filename}
-    self.local_img_path:  {self.local_img_path}
-    self.img:             {len(self.img)}
-    self.panel_contours:  {len(self.panel_contours)}
-    self.textboxes:       {len(self.textboxes)}
-    self.ocr_text:        {len(self.ocr_text)}
-    self.ocr_contours:    {len(self.ocr_contours)}
-    self.ocr_points:      {len(self.ocr_points)}
-    self.panel_text:      {len(self.panel_text)}
-    self.sentences:       {(self.sentences)}
-"""
+    id:              {self.id}
+    url:             {self.url}
+    img_url:         {self.img_url}
+    filename:        {self.filename}
+    alt_text:        {self.alt_text}
+    local_img_path:  {self.local_img_path}
+    panel_text:      """ + "\n                     ".join(self.panel_text)
     
 
 if __name__ == '__main__':
