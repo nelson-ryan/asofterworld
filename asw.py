@@ -312,7 +312,7 @@ class Comic:
         word_contours = []  # for storing all words
         word_points = []
 
-        for text in self.ocr_text:
+        for text in self.ocr_text[1:]:
             word_vertices = []  # for storing all vertices for a single word
             word_Xs = []
             word_Ys = []
