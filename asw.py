@@ -274,7 +274,7 @@ class Comic:
         for c in contours:
             boxpoints = cv2.boxPoints(cv2.minAreaRect(c))
             # filter by size
-            if 100 < cv2.contourArea(boxpoints) < 20000:
+            if 300 < cv2.contourArea(boxpoints) < self.smallestpanel: # < 20000:
                 boxcenter = (
                     int(np.mean([x[0] for x in boxpoints])),
                     int(np.mean([x[1] for x in boxpoints]))
@@ -534,6 +534,10 @@ class Comic:
             " ".join([t.description for t in panel])
             for panel in self.panel_text
         ]
+
+    @property
+    def smallestpanel(self):
+        return min([cv2.contourArea(panel) for panel in self.panel_contours])
 
     def parse(self):
         # TODO make a static variable?
