@@ -107,11 +107,12 @@ class Comic:
         return
 
 
-    def show_img(self, label = "img") -> None:
+    def show_img(self) -> None:
         """
         Display whichever image in a temporary window.
         """
-        cv2.imshow(label, self.img_contoured)
+        cv2.imshow(self.alt_text,
+                   self.img_contoured)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
         return None
@@ -182,13 +183,18 @@ class Comic:
         """
 
         # Threshold to get binary black-and-white
-        _, framethresh = cv2.threshold(self.img_grey, 40, 255, cv2.THRESH_BINARY)
+        _, framethresh = cv2.threshold(
+            src = self.img_grey,
+            thresh = 40,
+            maxval = 255,
+            type = cv2.THRESH_BINARY
+        )
 
         # Check threshold result by saving image
         if save_thresh:
             cv2.imwrite(
                 filename = (
-                    f'comics/{self.id:04d}_{self.filename.split(".")[0]}_textthresh.jpg'
+                    f'comics/{self.id:04d}_{self.filename.split(".")[0]}_panelthresh.jpg'
                 ),
                 img = framethresh
             )
@@ -246,36 +252,54 @@ class Comic:
         Seems to work for comic #8
         """
 
-        _, textboxthresh = cv2.threshold(
+        _, self.img_textboxthresh = cv2.threshold(
             src = self.img_grey,
             thresh = 240,
             maxval = 255,
             type = cv2.THRESH_BINARY
         )
         contours, _ = cv2.findContours(
-            image = textboxthresh,
+            image = self.img_textboxthresh,
             mode = cv2.RETR_LIST,
             method = cv2.CHAIN_APPROX_SIMPLE
         )
-        self.img_tbt = textboxthresh
-
-        # Identify panels by including only contours with sufficient area
-        textbox_contours = []
-        textbox_contours = [
-            cv2.boxPoints(cv2.minAreaRect(c)) for c in contours
-            if 200 < cv2.contourArea(c) < 50000
-        ]
-        # Convert entire list to contour ndarray
-        textbox_contours = np.array(textbox_contours, dtype=np.int32)
 
         cv2.imwrite(
             f'comics/{self.id:04d}_{self.filename.split(".")[0]}_textthresh.jpg',
-            textboxthresh
+            self.img_textboxthresh
         )
+
+        # List of textbox lists, assigned according to which panel they're in
+        textbox_assigned = [ [] for _ in self.panel_contours ]
+        for c in contours:
+            boxpoints = cv2.boxPoints(cv2.minAreaRect(c))
+            # filter by size
+            if 100 < cv2.contourArea(boxpoints) < 20000:
+                boxcenter = (
+                    int(np.mean([x[0] for x in boxpoints])),
+                    int(np.mean([x[1] for x in boxpoints]))
+                )
+
+                for panel_idx, panel in enumerate(self.panel_contours):
+                    if cv2.pointPolygonTest(
+                            contour = panel,
+                            pt = boxcenter,
+                            measureDist=False
+                    ) > 0:
+                        textbox_assigned[panel_idx].append(
+                            np.array(boxpoints, dtype = np.int32)
+                        )
+                        # cv2.drawContours(
+                        #     image = self.img_contoured,
+                        #     contours = np.array([boxpoints], dtype = np.int32),
+                        #     contourIdx = -1,
+                        #     color = (255,0,0),
+                        #     thickness = 2
+                        # )
 
         self.draw_textbox_outlines()
 
-        return textbox_contours
+        return textbox_assigned
 
 
     def _read_text(self) -> Sequence:
@@ -311,8 +335,9 @@ class Comic:
         """
         word_contours = []  # for storing all words
         word_points = []
+        new_text_tuples = []
 
-        for text in self.ocr_text[1:]:
+        for text in self.ocr_text[1:]: # skip the first, with all text
             word_vertices = []  # for storing all vertices for a single word
             word_Xs = []
             word_Ys = []
@@ -369,17 +394,74 @@ class Comic:
             )
 
     def draw_textbox_outlines(self):
-        cv2.drawContours(
-            image = self.img_contoured,
-            contours = self.textboxes,
-            contourIdx = -1,
-            color = (255, 255, 0),
-            thickness = 2
-        )
+        for t in self.textboxes:
+            cv2.drawContours(
+                image = self.img_contoured,
+                contours = t,
+                contourIdx = -1,
+                color = (255, 255, 0),
+                thickness = 2
+            )
+
+    def draw_ocr_text(self):
+        """
+        Recreates the labelmaker text and overlays it onto the image.
+        """
+        for panel in self.panel_text:
+            for text in panel:
+                contours = np.array( [
+                        [ [vertex.x, vertex.y] for vertex in text.bounding_poly.vertices ]
+                    ], dtype = np.int32
+                )
+                cv2.drawContours(
+                    image = self.img_contoured,
+                    contours = contours,
+                    contourIdx = -1,
+                    color = (255, 200, 200),
+                    thickness = cv2.FILLED
+                )
+                cv2.putText(
+                    self.img_contoured,
+                    text = text.description,
+                    org = tuple(contours[0][3]),
+                    fontFace = cv2.FONT_HERSHEY_COMPLEX,
+                    fontScale = .33,
+                    color = (120, 20, 80)
+                )
+
+
+    def _assign_panel_text(self):
+
+        self._text2coords()
+        assigned_text = [ [] for _ in self.panel_contours ]
+        for ocr_text in self.ocr_text[1:]:
+            vertices = ocr_text.bounding_poly.vertices
+            centerpoint = (
+                int(np.mean([vertex.x for vertex in vertices])),
+                int(np.mean([vertex.y for vertex in vertices]))
+            )
+            # cv2.circle(
+            #     img = self.img_contoured,
+            #     center = centerpoint, radius = 3, color = (255,0,255), thickness = cv2.FILLED
+            # )
+            for panel_i, panel_textboxes in enumerate(self.textboxes):
+                # Check if text is inside panel;
+                # pointPolygonTest returns 1 if inside, -1 if outside, 0 if edge
+                if any(
+                        cv2.pointPolygonTest(
+                            contour = textbox,
+                            pt = centerpoint,
+                            measureDist = False
+                        ) > 0
+                        for textbox in panel_textboxes
+                ):
+                    assigned_text[panel_i].append(ocr_text)
+        return assigned_text
+        self.new_assigned_text = assigned_text
 
 
     # Check for word location within panel contours, add corresponding text
-    def _assign_panel_text(self):
+    #def _assign_panel_text(self):
         """
         Group text according to which panel it appears in.
 
@@ -404,7 +486,7 @@ class Comic:
                 cv2.pointPolygonTest(
                     contour = panel_contour,
                     pt = tuple(ocr_point),
-                    measureDist=False
+                    measureDist = False
                 ) > 0
                 and 
                 # This is where the text is filtered for matching with textboxes
@@ -412,11 +494,12 @@ class Comic:
                 # TODO First reduce set of textboxes to only those in current panel
                 any(
                     cv2.pointPolygonTest(
-                        contour = textbox,
+                        contour = t,
                         pt = tuple(ocr_point),
-                        measureDist=False
+                        measureDist = False
                     ) > 0
                     for textbox in self.textboxes
+                    for t in textbox
                 )
             ]
             # Join separate list items into a single string and append
@@ -445,10 +528,16 @@ class Comic:
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
 
+    @property
+    def textbypanel(self):
+        return [
+            " ".join([t.description for t in panel])
+            for panel in self.panel_text
+        ]
 
     def parse(self):
         # TODO make a static variable?
-        doc = Comic.NLP(' '.join(self.panel_text))
+        doc = Comic.NLP(' '.join(self.textbypanel))
         self.sentences = [sent.constituency for sent in doc.sentences]
 
 
@@ -463,7 +552,7 @@ class Comic:
     filename:        {self.filename}
     alt_text:        {self.alt_text}
     local_img_path:  {self.local_img_path}
-    panel_text:      """ + "\n                     ".join(self.panel_text)
+    panel_text:      """ + "\n                     ".join(self.textbypanel)
     
 
 if __name__ == '__main__':
