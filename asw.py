@@ -32,7 +32,7 @@ import numpy as np
 import json
 from pathlib import Path
 from google.cloud import vision
-import stanza
+from stanza import Pipeline
 from typing import Sequence
 
 FIRST = 1
@@ -48,7 +48,11 @@ class Comic:
     """
     ASofterWorld individual comic object.
     """
-    NLP = stanza.Pipeline(lang='en', processors='tokenize,pos,constituency')
+    NLP = Pipeline(
+        lang='en',
+        processors='mwt,tokenize,pos,constituency',
+        logging_level="WARN"
+    )
     BASE_URL = 'https://www.asofterworld.com/index.php?id='
 
     IMG_FOLDER = 'comics'
