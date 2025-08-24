@@ -2,13 +2,13 @@
 
 ## Background
 
-A Softer World was a webcomic that ran from 2003 to 2015. Its format was
+*A Softer World* was a webcomic that ran from 2003 to 2015. Its format was
 similar to common three-panel comics, with short text superimposed over still
 photographs.
 
-My subjective experience while following A Softer World during its run was that
-the breaks between panels often seemed to be counter-intuitive, occurring within
-major constituent phrases rather than at their boundaries.
+My subjective experience while following *A Softer World* during its run was
+that the breaks between panels often seemed to be counter-intuitive,
+occurring within major constituent phrases rather than at their boundaries.
 
 ## Objective
 
@@ -19,16 +19,40 @@ the actual pattern present in A Softer World.
 
 ## Current Progress
 
-Each comic image, along with information from each (title, number, alt-text) is
-collected with use of the Beautiful Soup package. OpenCV and Google Vision OCR
-are used to identify the boundaries of individual comic frames and the text
-within them:
+Individual comics are scraped from *A Softer World* using BeautifulSoup.
+OpenCV and Google Vision OCR are used to identify the boundaries of individual
+comic frames and the text within them.
+
+## Example of Usage
+
+```python
+import asw
+c = asw.Comic(869)
+print(c)
+```
+```
+Retrieving html from https://www.asofterworld.com/index.php?id=869
+comics/0869_query.jpg already exists. Skipping download.
+Calling Google Vision OCR
+
+    id:              869
+    url:             https://www.asofterworld.com/index.php?id=869
+    img_url:         https://www.asofterworld.com/clean/query.jpg
+    filename:        query.jpg
+    hover:           the freedom of uncertainty.
+    local_img_path:  comics/0869_query.jpg
+    panel_text:      Having all the answers
+                     just means means you've been
+                     asking boring questions .
+```
+```python
+c.draw_panel_contours()
+c.draw_textbox_outlines()
+c.draw_ocr_text()
+c.show_img()
+```
 
 ![Example: asofterworld #869](doc/0869_query_contours.jpg)
-
-Note that the footer text below the frames are outside of the frames'
-boundaries in cyan (the reference point for the text is the green dot). The
-footer text is thus excluded due to not being contained within any frame.
 
 ## Next Steps
 
