@@ -119,9 +119,15 @@ class Comic:
         """Display whichever image in a temporary window."""
         cv2.imshow(self.hover,
                    self.img_contoured)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-        return None
+        # Trickery to wait for key or check if window already closed
+        # from https://stackoverflow.com/a/45564409/12662447
+        while True:
+            key = cv2.waitKey(20)
+            if key != -1:
+                break
+            if cv2.getWindowProperty(self.hover, cv2.WND_PROP_VISIBLE) < 1:
+                break
+        cv2.destroyWindow(self.hover)
 
 
     @cached_property
@@ -426,7 +432,7 @@ class Comic:
                     self.img_contoured,
                     text = text.description,
                     org = tuple(contours[0][3]),
-                    fontFace = cv2.FONT_HERSHEY_COMPLEX,
+                    fontFace = cv2.FONT_HERSHEY_DUPLEX,
                     fontScale = .38,
                     color = (120, 20, 80)
                 )
@@ -506,7 +512,7 @@ class Comic:
     filename:        {self.filename}
     hover:           {self.hover}
     local_img_path:  {self.local_img_path}
-    panel_text:      """ + "\n                     ".join(self.textbypanel)
+    panel_text:      """ + "\n                     ".join(self.textbypanel) + "\n"
     
 
 if __name__ == '__main__':
